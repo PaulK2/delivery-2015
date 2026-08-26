@@ -21,9 +21,12 @@ script locking.
 - Home: interactive Sofia map (Leaflet), date navigation, location detail panel
 - Schedule: real weekly-**grid** parser (isolated in `services/schedule/parser.js`),
   weekday matching, filters, admin schedule-source config
+- Vehicles (Phase 2): fleet list with plate search + status summary, vehicle detail
+  page, take / release (with parking form), double-reservation prevention, usage
+  history with period presets, read-only active-issues section, toast notifications
 
-Frontend still to build against the existing backend: Vehicles/fleet (Phase 2),
-Availability (Phase 3), Maintenance (Phase 4), Documents (Phase 5), polish (Phase 6).
+Frontend still to build against the existing backend: Availability (Phase 3),
+Maintenance reporting/resolution (Phase 4), Documents (Phase 5), Admin + polish (Phase 6).
 
 ## Getting started
 

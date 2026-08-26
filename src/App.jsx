@@ -5,6 +5,8 @@ import Spinner from './components/Spinner.jsx'
 import LoginPage from './pages/LoginPage.jsx'
 import HomePage from './pages/HomePage.jsx'
 import SchedulePage from './pages/SchedulePage.jsx'
+import VehiclesPage from './pages/VehiclesPage.jsx'
+import VehicleDetailPage from './pages/VehicleDetailPage.jsx'
 import PlaceholderPage from './pages/PlaceholderPage.jsx'
 
 function RequireAuth({ children }) {
@@ -43,10 +45,8 @@ export default function App() {
           path="/availability"
           element={<PlaceholderPage title="Следваща седмица" phase="Фаза 3" />}
         />
-        <Route
-          path="/vehicles"
-          element={<PlaceholderPage title="Автомобили" phase="Фаза 2" />}
-        />
+        <Route path="/vehicles" element={<VehiclesPage />} />
+        <Route path="/vehicles/:carId" element={<VehicleDetailPage />} />
         <Route
           path="/maintenance"
           element={<PlaceholderPage title="Сигнали и поддръжка" phase="Фаза 4" />}

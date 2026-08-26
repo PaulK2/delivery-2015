@@ -76,6 +76,59 @@ export function daysUntil(iso) {
   return Math.round((target - today) / 86400000)
 }
 
+// Backend timestamps come in two shapes: a naive "YYYY-MM-DDTHH:mm:ss" (already
+// Sofia local, e.g. from takeCar's response) and a real UTC instant with a
+// timezone marker "...Z" (Google Sheets coerces stored strings to datetimes, so
+// history reads back as UTC). Resolve both into Sofia-local parts.
+function sofiaParts(stamp) {
+  const s = String(stamp)
+  // Has timezone info -> a real instant; convert to Sofia.
+  if (/([Zz]|[+-]\d{2}:?\d{2})$/.test(s)) {
+    const d = new Date(s)
+    if (!isNaN(d.getTime())) {
+      const p = Object.fromEntries(
+        new Intl.DateTimeFormat('en-CA', {
+          timeZone: TZ,
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit',
+          hour: '2-digit',
+          minute: '2-digit',
+          hour12: false,
+        })
+          .formatToParts(d)
+          .map((x) => [x.type, x.value])
+      )
+      return { y: p.year, mo: p.month, d: p.day, h: p.hour, mi: p.minute }
+    }
+  }
+  // Naive local timestamp.
+  const m = s.match(/^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})/)
+  if (m) return { y: m[1], mo: m[2], d: m[3], h: m[4], mi: m[5] }
+  return null
+}
+
+// Format a backend timestamp as "DD.MM.YYYY HH:mm" in Sofia local time.
+export function formatStampBG(stamp) {
+  if (!stamp) return ''
+  const p = sofiaParts(stamp)
+  return p ? `${p.d}.${p.mo}.${p.y} ${p.h}:${p.mi}` : String(stamp)
+}
+
+// Just the HH:mm part of a backend timestamp, in Sofia local time.
+export function stampTime(stamp) {
+  if (!stamp) return ''
+  const p = sofiaParts(stamp)
+  return p ? `${p.h}:${p.mi}` : ''
+}
+
+// Sofia-local calendar date (YYYY-MM-DD) of a backend timestamp — for filtering.
+export function stampDateISO(stamp) {
+  if (!stamp) return ''
+  const p = sofiaParts(stamp)
+  return p ? `${p.y}-${p.mo}-${p.d}` : ''
+}
+
 // Current HH:mm in Sofia time.
 export function nowTimeBG() {
   return new Intl.DateTimeFormat('bg-BG', {
