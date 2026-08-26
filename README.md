@@ -24,9 +24,17 @@ script locking.
 - Vehicles (Phase 2): fleet list with plate search + status summary, vehicle detail
   page, take / release (with parking form), double-reservation prevention, usage
   history with period presets, read-only active-issues section, toast notifications
+- Availability (Phase 3): next-week matrix (none/full/evening per day, single-select),
+  save own availability, team overview matrix, admin open/close + active-week +
+  per-day counts + who-hasn't-submitted
 
-Frontend still to build against the existing backend: Availability (Phase 3),
-Maintenance reporting/resolution (Phase 4), Documents (Phase 5), Admin + polish (Phase 6).
+> Phase 3 added two backend actions (`getAvailabilityStatus`, `setAvailabilityWeek`)
+> and a date normalizer in `Backend.gs` — **redeploy the Apps Script** for accurate
+> open/close state, week selection, and duplicate-free re-saves. The frontend degrades
+> gracefully until then (normalizes dates client-side; assumes the period is open).
+
+Frontend still to build against the existing backend: Maintenance reporting/resolution
+(Phase 4), Documents (Phase 5), Admin + polish (Phase 6).
 
 ## Getting started
 

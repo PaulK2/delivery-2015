@@ -129,6 +129,18 @@ export function stampDateISO(stamp) {
   return p ? `${p.y}-${p.mo}-${p.d}` : ''
 }
 
+// Normalize any date-ish value (plain YYYY-MM-DD, DD.MM.YYYY, or a UTC ISO stamp
+// that Sheets produced by coercing a date cell) to a Sofia-local YYYY-MM-DD.
+export function toIsoDate(v) {
+  if (v == null || v === '') return ''
+  const s = String(v).trim()
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s
+  const bg = s.match(/^(\d{2})\.(\d{2})\.(\d{4})$/)
+  if (bg) return `${bg[3]}-${bg[2]}-${bg[1]}`
+  const iso = stampDateISO(s)
+  return iso || s.slice(0, 10)
+}
+
 // Current HH:mm in Sofia time.
 export function nowTimeBG() {
   return new Intl.DateTimeFormat('bg-BG', {

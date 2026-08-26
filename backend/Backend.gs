@@ -328,6 +328,38 @@ function dateOnly(date) {
 }
 
 
+/**
+ * Normalize any date-ish value to a Sofia-local yyyy-MM-dd string.
+ * Google Sheets coerces stored "yyyy-MM-dd" strings into Date cells, so values
+ * read back are Dates (or UTC ISO once serialized). This recovers the intended
+ * calendar date in Sofia time.
+ */
+function normalizeIsoDate(value) {
+
+  if (value === '' || value == null) {
+    return '';
+  }
+
+  if (value instanceof Date) {
+    return Utilities.formatDate(value, TIMEZONE, 'yyyy-MM-dd');
+  }
+
+  var s = String(value).trim();
+
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) {
+    return s;
+  }
+
+  var d = new Date(s);
+
+  if (!isNaN(d.getTime())) {
+    return Utilities.formatDate(d, TIMEZONE, 'yyyy-MM-dd');
+  }
+
+  return s;
+}
+
+
 function normalizeBoolean(value) {
 
   if (value === true) {
@@ -2810,8 +2842,8 @@ function getAvailability(params, ctx) {
         function(row) {
 
           return (
-            String(row.week_start) ===
-            String(params.weekStart)
+            normalizeIsoDate(row.week_start) ===
+            String(params.weekStart).trim()
           );
         }
       );
@@ -2824,6 +2856,12 @@ function getAvailability(params, ctx) {
         function(row) {
 
           delete row.__row;
+
+          row.week_start =
+            normalizeIsoDate(row.week_start);
+
+          row.date =
+            normalizeIsoDate(row.date);
 
           return row;
         }
@@ -2927,12 +2965,12 @@ function saveAvailability(params, ctx) {
         ctx.user.employee_id
       ) &&
 
-      String(
+      normalizeIsoDate(
         rows[r].week_start
       ) ===
       String(
         weekStart
-      )
+      ).trim()
     ) {
 
       deleteRows.push(
@@ -3041,6 +3079,112 @@ function setAvailabilityOpen(params, ctx) {
   return ok({
     open: open
   });
+}
+
+
+/**
+ * Read the availability period state (any authenticated user).
+ * week_start defaults to next week's Monday if not explicitly set by an admin.
+ */
+function getAvailabilityStatus(params, ctx) {
+
+  var unauth =
+    requireAuth(ctx);
+
+  if (unauth) {
+    return unauth;
+  }
+
+  var weekStart =
+    getSetting('availability_week_start');
+
+  if (!weekStart) {
+    weekStart = nextMondayISO();
+  }
+
+  return ok({
+
+    open:
+      getSetting('availability_open') === 'true',
+
+    week_start:
+      weekStart
+  });
+}
+
+
+/**
+ * Admin: set the active availability week (Monday, ISO yyyy-MM-dd).
+ */
+function setAvailabilityWeek(params, ctx) {
+
+  var notAdmin =
+    requireAdmin(ctx);
+
+  if (notAdmin) {
+    return notAdmin;
+  }
+
+  var weekStart =
+    String(params.weekStart || '').trim();
+
+  if (
+    !/^\d{4}-\d{2}-\d{2}$/.test(weekStart)
+  ) {
+    return fail('validation');
+  }
+
+  setSetting(
+    'availability_week_start',
+    weekStart
+  );
+
+  audit(
+    ctx.user,
+    'availability_week_set',
+    'settings',
+    'availability_week_start',
+    weekStart
+  );
+
+  return ok({
+    week_start: weekStart
+  });
+}
+
+
+/**
+ * Monday of NEXT week, in Sofia time (yyyy-MM-dd).
+ */
+function nextMondayISO() {
+
+  var todayIso =
+    Utilities.formatDate(
+      new Date(),
+      TIMEZONE,
+      'yyyy-MM-dd'
+    );
+
+  var d =
+    new Date(todayIso + 'T12:00:00');
+
+  var day =
+    d.getDay(); // 0=Sun..6=Sat
+
+  var diff =
+    day === 0
+      ? 1
+      : 8 - day;
+
+  d.setDate(
+    d.getDate() + diff
+  );
+
+  return Utilities.formatDate(
+    d,
+    TIMEZONE,
+    'yyyy-MM-dd'
+  );
 }
 
 
@@ -3534,6 +3678,15 @@ var ROUTES = {
 
   setAvailabilityOpen: {
     fn: setAvailabilityOpen,
+    lock: true
+  },
+
+  getAvailabilityStatus: {
+    fn: getAvailabilityStatus
+  },
+
+  setAvailabilityWeek: {
+    fn: setAvailabilityWeek,
     lock: true
   }
 };

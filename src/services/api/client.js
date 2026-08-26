@@ -82,6 +82,7 @@ function mapErrorBG(code) {
     car_not_available: 'Автомобилът не е свободен в момента.',
     not_found: 'Записът не е намерен.',
     schedule_load_failed: 'Графикът не може да бъде зареден. Проверете Google Sheet връзката.',
+    availability_closed: 'Приемът на наличност е затворен.',
     validation: 'Проверете въведените данни.',
     server_error: 'Възникна проблем със сървъра. Опитайте отново.',
   }
