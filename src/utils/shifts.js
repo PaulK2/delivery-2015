@@ -26,13 +26,17 @@ export function shiftLabel(type) {
   return SHIFT_LABELS[type] || type || ''
 }
 
-// Format a shift payment (СМЯНА) for display, e.g. "45 лв". Returns '' when empty.
-export function formatPayment(payment) {
-  if (payment == null) return ''
-  const s = String(payment).trim()
+// Format a money value for display, e.g. "45 €". Non-numeric values pass through
+// unchanged; empty -> ''. Currency symbol comes from config (spec §90).
+export function formatMoney(value) {
+  if (value == null) return ''
+  const s = String(value).trim()
   if (!s) return ''
-  return /^\d+([.,]\d+)?$/.test(s) ? `${s} лв` : s
+  return /^\d+([.,]\d+)?$/.test(s) ? `${s} ${CONFIG.currencySymbol}` : s
 }
+
+// Shift payment (СМЯНА) display — same formatting as any money value.
+export const formatPayment = formatMoney
 
 // Sort order for a location panel: full-day shifts before evening (spec §8).
 export function shiftSortRank(type) {

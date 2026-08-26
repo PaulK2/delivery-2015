@@ -25,6 +25,7 @@ export const CONFIG = {
   organization: 'delivery-2015',
   timezone: 'Europe/Sofia',
   locale: 'bg-BG',
+  currencySymbol: '€',
 
   // Sofia map defaults
   map: {

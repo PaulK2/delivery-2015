@@ -12,6 +12,7 @@ import { reportIssue, resolveIssue } from '../services/maintenance/maintenance.j
 import { useAuth } from '../context/AuthContext.jsx'
 import { useToast } from '../context/ToastContext.jsx'
 import { carTitle, SEVERITY, severityRank, categoryLabel } from '../utils/vehicles.js'
+import { formatMoney } from '../utils/shifts.js'
 import { formatStampBG } from '../utils/datetime.js'
 import StatusBadge from '../components/StatusBadge.jsx'
 import ReleaseCarModal from '../components/ReleaseCarModal.jsx'
@@ -309,7 +310,7 @@ export default function VehicleDetailPage() {
                 ) : null}
                 <div className="repair-item__meta">
                   {r.service ? <span>🔧 {r.service}</span> : null}
-                  {r.cost ? <span>💰 {r.cost} лв</span> : null}
+                  {r.cost ? <span>💰 {formatMoney(r.cost)}</span> : null}
                   {r.resolved_by_name ? <span>✔ {r.resolved_by_name}</span> : null}
                 </div>
               </li>
