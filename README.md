@@ -31,14 +31,18 @@ script locking.
   critical auto-blocks the vehicle + admin restore-to-service, admin resolve with
   repair details, per-vehicle repair history, global Сигнали и поддръжка page with
   filters (status/severity/category/plate)
+- Documents (Phase 5): reusable VehicleDocument model (insurance, annual inspection,
+  vignette, road tax, casco, …) with 🟢/🟡/🔴 valid/expiring/expired status per
+  configurable warning threshold; admin add/edit per vehicle; admin "Предстоящи
+  срокове" widget on Home sorted by nearest expiry
 
 > Phase 3 added two backend actions (`getAvailabilityStatus`, `setAvailabilityWeek`)
 > and a date normalizer in `Backend.gs` — **redeploy the Apps Script** for accurate
 > open/close state, week selection, and duplicate-free re-saves. The frontend degrades
 > gracefully until then (normalizes dates client-side; assumes the period is open).
 
-Frontend still to build against the existing backend: Documents (Phase 5),
-Admin + polish (Phase 6).
+Frontend still to build against the existing backend: Administration screens +
+PWA/search/polish (Phase 6).
 
 ## Getting started
 

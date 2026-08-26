@@ -1588,3 +1588,161 @@ textarea.input {
   border-radius: var(--radius-sm);
   padding: 6px 8px;
 }
+
+/* ============================================================
+   Phase 5 — Documents & deadlines
+   ============================================================ */
+
+.field-row {
+  display: flex;
+  gap: 10px;
+}
+.field-row .field {
+  flex: 1;
+}
+.detail-section__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+.detail-section__head .detail-section__title {
+  margin: 0;
+}
+
+.doc-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.doc-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+}
+.doc-item--ok {
+  border-left-color: var(--ok);
+}
+.doc-item--warn {
+  border-left-color: var(--warn);
+}
+.doc-item--danger {
+  border-left-color: var(--danger);
+}
+.doc-item__type {
+  font-weight: 700;
+}
+.doc-item__sub {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  font-size: 13px;
+  color: var(--text-2);
+  margin-top: 2px;
+}
+.doc-item__notes {
+  font-size: 13px;
+  color: var(--muted);
+  margin-top: 4px;
+}
+.doc-item__side {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.doc-badge {
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+  padding: 4px 8px;
+  border-radius: 999px;
+}
+.doc-badge--ok {
+  background: #ecfdf5;
+  color: #047857;
+}
+.doc-badge--warn {
+  background: #fffbeb;
+  color: #92400e;
+}
+.doc-badge--danger {
+  background: #fef2f2;
+  color: var(--danger);
+}
+.doc-badge--muted {
+  background: var(--surface-2);
+  color: var(--muted);
+}
+.doc-item__edit {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  padding: 4px 8px;
+  color: var(--text-2);
+}
+
+/* Upcoming deadlines widget */
+.deadlines {
+  margin-top: 14px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  box-shadow: var(--shadow);
+}
+.deadlines__title {
+  margin: 0 0 10px;
+  font-size: 16px;
+}
+.deadlines__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+.deadline {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 0;
+  border-top: 1px solid var(--border);
+}
+.deadline:first-child {
+  border-top: none;
+}
+.deadline__plate {
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  text-decoration: none;
+  color: var(--accent-dark);
+  min-width: 92px;
+}
+.deadline__type {
+  flex: 1;
+  color: var(--text-2);
+  font-size: 14px;
+}
+.deadline__days {
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.deadline__days--warn {
+  color: var(--warn);
+}
+.deadline__days--danger {
+  color: var(--danger);
+}

@@ -9,6 +9,7 @@ import {
   restoreCarToService,
 } from '../services/fleet/fleet.js'
 import { reportIssue, resolveIssue } from '../services/maintenance/maintenance.js'
+import { getVehicleDocuments, saveVehicleDocument } from '../services/documents/documents.js'
 import { useAuth } from '../context/AuthContext.jsx'
 import { useToast } from '../context/ToastContext.jsx'
 import { carTitle, SEVERITY, severityRank, categoryLabel } from '../utils/vehicles.js'
@@ -19,6 +20,8 @@ import ReleaseCarModal from '../components/ReleaseCarModal.jsx'
 import ReportIssueModal from '../components/ReportIssueModal.jsx'
 import ResolveIssueModal from '../components/ResolveIssueModal.jsx'
 import UsageHistoryList from '../components/UsageHistoryList.jsx'
+import DocumentsSection from '../components/DocumentsSection.jsx'
+import DocumentModal from '../components/DocumentModal.jsx'
 import Spinner from '../components/Spinner.jsx'
 
 export default function VehicleDetailPage() {
@@ -28,6 +31,7 @@ export default function VehicleDetailPage() {
 
   const [car, setCar] = useState(null)
   const [maintenance, setMaintenance] = useState([])
+  const [documents, setDocuments] = useState([])
   const [history, setHistory] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -35,11 +39,17 @@ export default function VehicleDetailPage() {
   const [showRelease, setShowRelease] = useState(false)
   const [showReport, setShowReport] = useState(false)
   const [resolving, setResolving] = useState(null) // issue being resolved, or null
+  const [docModal, setDocModal] = useState(null) // { doc } to edit/add, or null closed
 
   const loadCar = useCallback(async () => {
-    const [c, m] = await Promise.all([getCar(carId), getCarMaintenance(carId)])
+    const [c, m, d] = await Promise.all([
+      getCar(carId),
+      getCarMaintenance(carId),
+      getVehicleDocuments(carId),
+    ])
     setCar(c)
     setMaintenance(m)
+    setDocuments(d)
     return c
   }, [carId])
 
@@ -135,6 +145,20 @@ export default function VehicleDetailPage() {
       await resolveIssue(payload)
       setResolving(null)
       showToast('Проблемът е отстранен.', 'success')
+      await refresh()
+    } catch (e) {
+      showToast(e.message || 'Възникна проблем.', 'error')
+    } finally {
+      setActing(false)
+    }
+  }
+
+  async function onSaveDocument(payload) {
+    setActing(true)
+    try {
+      await saveVehicleDocument(payload)
+      setDocModal(null)
+      showToast('Документът е записан.', 'success')
       await refresh()
     } catch (e) {
       showToast(e.message || 'Възникна проблем.', 'error')
@@ -278,6 +302,14 @@ export default function VehicleDetailPage() {
         </button>
       </div>
 
+      {/* Documents & deadlines (spec §46–§50) */}
+      <DocumentsSection
+        documents={documents}
+        isAdmin={isAdmin}
+        onAdd={() => setDocModal({ doc: null })}
+        onEdit={(doc) => setDocModal({ doc })}
+      />
+
       {/* Usage history */}
       <section className="detail-section">
         <h2 className="detail-section__title">История на ползване</h2>
@@ -330,6 +362,15 @@ export default function VehicleDetailPage() {
           issue={resolving}
           onClose={() => setResolving(null)}
           onSubmit={onResolve}
+          submitting={acting}
+        />
+      ) : null}
+      {docModal ? (
+        <DocumentModal
+          carId={carId}
+          doc={docModal.doc}
+          onClose={() => setDocModal(null)}
+          onSubmit={onSaveDocument}
           submitting={acting}
         />
       ) : null}

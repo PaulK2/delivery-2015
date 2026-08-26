@@ -5,11 +5,14 @@ import { CONFIG } from '../config/index.js'
 import DateNav from '../components/DateNav.jsx'
 import SofiaMap from '../components/SofiaMap.jsx'
 import LocationDetailPanel from '../components/LocationDetailPanel.jsx'
+import UpcomingDeadlines from '../components/UpcomingDeadlines.jsx'
 import Spinner from '../components/Spinner.jsx'
+import { useAuth } from '../context/AuthContext.jsx'
 
 const norm = (s) => (s || '').toString().trim().toLowerCase()
 
 export default function HomePage() {
+  const { isAdmin } = useAuth()
   const [date, setDate] = useState(todayISO())
   const [locations, setLocations] = useState([])
   const [schedule, setSchedule] = useState({ entries: [], locationNames: [] })
@@ -143,6 +146,8 @@ export default function HomePage() {
           )}
         </div>
       </div>
+
+      {isAdmin ? <UpcomingDeadlines /> : null}
     </div>
   )
 }
