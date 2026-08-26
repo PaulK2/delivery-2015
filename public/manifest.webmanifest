@@ -1,0 +1,19 @@
+{
+  "name": "Автопарк — delivery-2015",
+  "short_name": "Автопарк",
+  "description": "Вътрешна платформа за управление на автопарк",
+  "lang": "bg",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f4f5f7",
+  "theme_color": "#f97316",
+  "icons": [
+    {
+      "src": "/icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
