@@ -7,21 +7,23 @@ backed by **Google Sheets + Google Apps Script** (no traditional SQL database).
 User → React app (GitHub Pages) → Apps Script Web App → Google Sheets
 ```
 
-## Status — Phase 1 (Foundation)
+## Status
 
-Implemented:
+**Backend** (`backend/Backend.gs`) — the real deployed Apps Script — already covers
+every phase: auth/sessions, employees, locations, schedule (read-only), cars +
+take/release, usage history, maintenance, documents, availability, audit log,
+script locking.
 
-- Project scaffold (Vite + React, HashRouter, PWA manifest)
-- Central config, Bulgarian date/time + shift utilities
-- Auth: employee + PIN login, server-side sessions, hashed PINs
-- Home page: interactive Sofia map (Leaflet), date navigation, location detail panel
-- Current schedule page: filters (employee / location / shift), day grouping,
-  isolated schedule parser, admin schedule-source config
-- Apps Script backend: `auth`, `schedule`, `locations`, audit log, script locking
-- Google Sheets schema + setup helpers
+**Frontend** — Phase 1 wired end-to-end against the live backend:
 
-Later phases (per the build spec): Fleet (§Phase 2), Availability (§Phase 3),
-Maintenance (§Phase 4), Documents (§Phase 5), Polish/PWA/search (§Phase 6).
+- Scaffold (Vite + React, HashRouter, PWA manifest), central config, BG date/shift utils
+- Auth: employee + PIN login, server-side sessions
+- Home: interactive Sofia map (Leaflet), date navigation, location detail panel
+- Schedule: real weekly-**grid** parser (isolated in `services/schedule/parser.js`),
+  weekday matching, filters, admin schedule-source config
+
+Frontend still to build against the existing backend: Vehicles/fleet (Phase 2),
+Availability (Phase 3), Maintenance (Phase 4), Documents (Phase 5), polish (Phase 6).
 
 ## Getting started
 
@@ -36,7 +38,7 @@ npm run dev
 ## Structure
 
 ```
-backend/            Google Apps Script (.gs) — the API + data bridge
+backend/            Backend.gs — the deployed Google Apps Script (API + data bridge)
 src/
   config/           app configuration (shift times, map, thresholds)
   services/         api client, auth, schedule (+ isolated parser)

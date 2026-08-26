@@ -46,6 +46,21 @@ export function weekdayBG(iso) {
   return WEEKDAYS_BG[d.getDay()] || ''
 }
 
+// JS getDay() index (0=Sunday) for an ISO date. Used to match schedule entries,
+// which are keyed by weekday rather than calendar date.
+export function weekdayIndex(iso) {
+  if (!iso) return null
+  return new Date(`${iso}T12:00:00`).getDay()
+}
+
+// Bulgarian weekday name from a JS getDay() index (0=Sunday).
+export function weekdayNameByIndex(idx) {
+  return WEEKDAYS_BG[idx] || ''
+}
+
+// Monday-first ordering of getDay() indices, for weekly views.
+export const WEEK_ORDER = [1, 2, 3, 4, 5, 6, 0]
+
 // Shift an ISO date by a number of days (can be negative).
 export function shiftISO(iso, days) {
   const d = new Date(`${iso}T12:00:00`)

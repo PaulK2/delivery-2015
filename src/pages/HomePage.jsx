@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { getLocations, getSchedule } from '../services/schedule/schedule.js'
-import { todayISO } from '../utils/datetime.js'
+import { todayISO, weekdayIndex } from '../utils/datetime.js'
 import { CONFIG } from '../config/index.js'
 import DateNav from '../components/DateNav.jsx'
 import SofiaMap from '../components/SofiaMap.jsx'
@@ -12,7 +12,7 @@ const norm = (s) => (s || '').toString().trim().toLowerCase()
 export default function HomePage() {
   const [date, setDate] = useState(todayISO())
   const [locations, setLocations] = useState([])
-  const [schedule, setSchedule] = useState([])
+  const [schedule, setSchedule] = useState({ entries: [], locationNames: [] })
   const [selectedId, setSelectedId] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -43,22 +43,23 @@ export default function HomePage() {
     }
   }, [])
 
-  // Match a schedule entry to a location by id, else by normalized name.
   const locByName = useMemo(() => {
     const m = new Map()
     locations.forEach((l) => m.set(norm(l.name), l.location_id))
     return m
   }, [locations])
 
+  // Schedule entries are keyed by weekday; match the selected date's weekday.
+  const wd = weekdayIndex(date)
   const entriesForDate = useMemo(
-    () => schedule.filter((e) => e.date === date),
-    [schedule, date]
+    () => schedule.entries.filter((e) => e.weekday === wd),
+    [schedule, wd]
   )
 
   const entriesByLocation = useMemo(() => {
     const map = {}
     for (const e of entriesForDate) {
-      const locId = e.location_id || locByName.get(norm(e.location_name))
+      const locId = locByName.get(norm(e.location_name))
       if (!locId) continue
       ;(map[locId] ||= []).push(e)
     }
@@ -70,6 +71,13 @@ export default function HomePage() {
     for (const [id, list] of Object.entries(entriesByLocation)) c[id] = list.length
     return c
   }, [entriesByLocation])
+
+  // Location names present in the schedule but missing from the Locations tab
+  // (so they can't be placed on the map yet).
+  const unmappedNames = useMemo(() => {
+    const present = new Set(locations.map((l) => norm(l.name)))
+    return [...new Set(schedule.locationNames.filter((n) => !present.has(norm(n))))]
+  }, [locations, schedule.locationNames])
 
   const selectedLocation = locations.find((l) => l.location_id === selectedId) || null
 
@@ -93,6 +101,13 @@ export default function HomePage() {
           <button className="btn btn--sm btn--ghost" onClick={() => load(true)}>
             Опитай отново
           </button>
+        </div>
+      ) : null}
+
+      {locations.length === 0 && unmappedNames.length > 0 ? (
+        <div className="banner banner--warn">
+          Локациите от графика още нямат координати: {unmappedNames.join(', ')}. Добавете ги в
+          Администрация, за да се покажат на картата.
         </div>
       ) : null}
 

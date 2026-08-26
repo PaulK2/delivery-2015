@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
-import { getSchedule, refreshSchedule } from '../services/schedule/schedule.js'
-import { formatDateBG, weekdayBG } from '../utils/datetime.js'
+import { getSchedule } from '../services/schedule/schedule.js'
+import { weekdayNameByIndex, WEEK_ORDER } from '../utils/datetime.js'
 import { shiftHours, shiftSortRank, SHIFT_LABELS } from '../utils/shifts.js'
 import { useAuth } from '../context/AuthContext.jsx'
 import Spinner from '../components/Spinner.jsx'
@@ -10,17 +10,16 @@ const uniqSorted = (arr) => [...new Set(arr.filter(Boolean))].sort((a, b) => a.l
 
 export default function SchedulePage() {
   const { isAdmin } = useAuth()
-  const [schedule, setSchedule] = useState([])
+  const [data, setData] = useState({ entries: [], locationNames: [], configured: true, sheetName: '' })
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [filters, setFilters] = useState({ employee: '', location: '', shift: '' })
 
-  async function load(refresh = false) {
+  async function load() {
     setLoading(true)
     setError('')
     try {
-      const data = refresh ? await refreshSchedule() : await getSchedule()
-      setSchedule(data)
+      setData(await getSchedule())
     } catch (e) {
       setError(e.message || 'Графикът не може да бъде зареден.')
     } finally {
@@ -29,27 +28,27 @@ export default function SchedulePage() {
   }
 
   useEffect(() => {
-    load(false)
+    load()
   }, [])
 
-  const employees = useMemo(() => uniqSorted(schedule.map((e) => e.employee_name)), [schedule])
-  const locations = useMemo(() => uniqSorted(schedule.map((e) => e.location_name)), [schedule])
+  const employees = useMemo(() => uniqSorted(data.entries.map((e) => e.employee_name)), [data])
+  const locations = useMemo(() => uniqSorted(data.entries.map((e) => e.location_name)), [data])
 
   const filtered = useMemo(() => {
-    return schedule.filter((e) => {
+    return data.entries.filter((e) => {
       if (filters.employee && e.employee_name !== filters.employee) return false
       if (filters.location && e.location_name !== filters.location) return false
       if (filters.shift && e.shift_type !== filters.shift) return false
       return true
     })
-  }, [schedule, filters])
+  }, [data, filters])
 
-  // Group by date (spec §15 — "by day" view).
-  const byDay = useMemo(() => {
+  // Group by weekday, Monday-first (spec §15 — "by day" view).
+  const byWeekday = useMemo(() => {
     const map = new Map()
     for (const e of filtered) {
-      if (!map.has(e.date)) map.set(e.date, [])
-      map.get(e.date).push(e)
+      if (!map.has(e.weekday)) map.set(e.weekday, [])
+      map.get(e.weekday).push(e)
     }
     for (const list of map.values()) {
       list.sort(
@@ -58,19 +57,19 @@ export default function SchedulePage() {
           a.location_name.localeCompare(b.location_name, 'bg')
       )
     }
-    return [...map.entries()].sort((a, b) => a[0].localeCompare(b[0]))
+    return WEEK_ORDER.filter((wd) => map.has(wd)).map((wd) => [wd, map.get(wd)])
   }, [filtered])
 
   return (
     <div className="page">
       <div className="page__header">
         <h1 className="page__title">График</h1>
-        <button className="btn btn--ghost btn--sm" onClick={() => load(true)}>
+        <button className="btn btn--ghost btn--sm" onClick={load}>
           ↻ Обнови
         </button>
       </div>
 
-      {isAdmin ? <ScheduleSourceConfig onLoaded={() => load(true)} /> : null}
+      {isAdmin ? <ScheduleSourceConfig onLoaded={load} /> : null}
 
       <div className="filters">
         <select
@@ -113,19 +112,22 @@ export default function SchedulePage() {
       ) : error ? (
         <div className="banner banner--error" role="alert">
           {error}
-          <button className="btn btn--sm btn--ghost" onClick={() => load(true)}>
+          <button className="btn btn--sm btn--ghost" onClick={load}>
             Опитай отново
           </button>
         </div>
-      ) : byDay.length === 0 ? (
+      ) : !data.configured ? (
+        <div className="empty-state">
+          Графикът не е конфигуриран. {isAdmin ? 'Задайте Google Sheet връзка по-горе.' : 'Свържете се с администратор.'}
+        </div>
+      ) : byWeekday.length === 0 ? (
         <div className="empty-state">Няма записи в графика за избраните филтри.</div>
       ) : (
         <div className="schedule-days">
-          {byDay.map(([date, entries]) => (
-            <section key={date} className="schedule-day">
+          {byWeekday.map(([wd, entries]) => (
+            <section key={wd} className="schedule-day">
               <h2 className="schedule-day__head">
-                <span className="schedule-day__weekday">{weekdayBG(date)}</span>
-                <span className="schedule-day__date">{formatDateBG(date)}</span>
+                <span className="schedule-day__weekday">{weekdayNameByIndex(wd)}</span>
                 <span className="schedule-day__count">{entries.length}</span>
               </h2>
               <ul className="schedule-list">
@@ -134,8 +136,9 @@ export default function SchedulePage() {
                     key={e.schedule_id}
                     className={'schedule-item schedule-item--' + e.shift_type}
                   >
-                    <span className="schedule-item__person">{e.employee_name || '—'}</span>
-                    <span className="schedule-item__location">{e.location_name || '—'}</span>
+                    <span className="schedule-item__person">{e.employee_name}</span>
+                    <span className="schedule-item__location">{e.location_name}</span>
+                    {e.car ? <span className="schedule-item__car">{e.car}</span> : null}
                     <span className="schedule-item__hours">{shiftHours(e.shift_type)}</span>
                   </li>
                 ))}

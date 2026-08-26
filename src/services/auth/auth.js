@@ -30,8 +30,10 @@ export async function validateSession() {
 }
 
 // Public: list of employees for the login dropdown (spec §53). No PINs returned.
+// The backend returns either a bare array or { employees: [...] } — accept both.
 export async function getEmployeesForLogin() {
-  return api('getEmployeesForLogin', {})
+  const data = await api('getEmployeesForLogin', {})
+  return Array.isArray(data) ? data : data?.employees || []
 }
 
 export function isAdmin(user) {

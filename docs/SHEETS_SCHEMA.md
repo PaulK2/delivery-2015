@@ -1,61 +1,64 @@
 # Google Sheets structure
 
-The backend Apps Script is **bound to one spreadsheet** (the data layer). Each entity
-lives in its own tab. IDs are immutable and prefixed (spec §59) — never rely on row
-numbers as identity.
+The backend Apps Script is **bound to one spreadsheet** (the "Fleet App Data"
+datastore). Each entity lives in its own tab. IDs are immutable and prefixed
+(spec §59). Run `setup()` once to auto-create the tabs with the correct headers.
 
-Run the `setup()` function once from the Apps Script editor to auto-create the core
-tabs with the correct headers and seed a first admin.
+## Datastore tabs
 
-## Employees
-| employee_id | name | role | pin_hash | active |
-|-------------|------|------|----------|--------|
-| EMP-a1b2c3 | Иван Петров | employee | *(sha-256 hash)* | TRUE |
+| Tab | Columns |
+|-----|---------|
+| **Employees** | employee_id, name, role, pin_hash, active |
+| **Locations** | location_id, name, address, latitude, longitude, active |
+| **Sessions** | token, employee_id, created_at, expires_at |
+| **Settings** | key, value |
+| **Audit** | audit_id, timestamp, employee_id, employee_name, action, entity_type, entity_id, details |
+| **Cars** | car_id, registration, make, model, year, image, status, current_driver_id, current_driver_name, current_usage_id, parked_location, notes, active |
+| **UsageHistory** | usage_id, car_id, registration, employee_id, employee_name, start_at, end_at, parked_location, notes |
+| **Maintenance** | maintenance_id, car_id, registration, reported_by_id, reported_by_name, reported_at, title, description, category, severity, status, resolved_at, resolved_by_id, resolved_by_name, repair_description, service, cost, notes |
+| **Documents** | document_id, car_id, registration, type, provider, document_number, valid_from, valid_until, warning_days, notes |
+| **Availability** | availability_id, employee_id, employee_name, week_start, date, shift_type, updated_at |
 
-- `role`: `employee` or `admin`
-- `pin_hash`: set via the `setPin()` / `addEmployee()` helpers — **never type a PIN here directly**
-- `active`: `TRUE` / `FALSE`
+- `role`: `employee` \| `admin`; `pin_hash`: salted SHA-256 (never a plaintext PIN)
+- Car `status`: `available` \| `in_use` \| `maintenance` \| `inactive`
+- Settings keys: `app_name`, `current_schedule_sheet_url`, `schedule_tab_name`,
+  `document_warning_days`, `timezone`, `full_shift_start/end`,
+  `evening_shift_start/end`, `map_default_lat/lng`, `availability_open`,
+  `availability_week_start`
 
-## Locations
-| location_id | name | address | latitude | longitude | active |
-|-------------|------|---------|----------|-----------|--------|
-| LOC-a1b2c3 | Сердика | бул. Тодор Александров 1 | 42.6977 | 23.3219 | TRUE |
+## Locations & the map
 
-Latitude/longitude place the orange marker on the Sofia map.
-
-## Sessions
-| token | employee_id | created_at | expires_at |
-Managed automatically by the backend (login/logout). Do not edit by hand.
-
-## Settings
-| key | value |
-Keys (spec §58): `app_name`, `current_schedule_sheet_url`, `schedule_tab_name`,
-`document_warning_days`, `timezone`, `full_shift_start`, `full_shift_end`,
-`evening_shift_start`, `evening_shift_end`, `map_default_lat`, `map_default_lng`,
-`availability_open`, `current_week_start`, `availability_week_start`.
-
-## Audit
-| audit_id | timestamp | employee_id | employee_name | action | entity_type | entity_id | details |
-Append-only log of important actions (spec §63).
+The Home map matches schedule location names to `Locations` rows **by name**
+(case-insensitive). For a marker to appear, the location must exist here **with
+latitude/longitude**. The six current schedule locations are: Пирин, Гоце Делчев,
+Черковна, Студентски град, Студентски град 2, Младост.
 
 ---
 
-## Schedule source (separate spreadsheet)
+## Schedule source (separate, read-only sheet)
 
-The weekly schedule is a **separate** Google Sheet whose URL an admin sets in-app
-(**График → Google Sheet за текущия график**). Expected first-tab layout (spec §57):
+The weekly schedule is the real management grid — **not** a simple table. The
+backend returns it verbatim via `getScheduleRaw` (a 2D matrix of display values);
+the frontend parser (`src/services/schedule/parser.js`) normalizes it.
 
-| date | day | restaurant | person | shift type | shift_payment |
-|------|-----|------------|--------|------------|---------------|
-| 27.08.2026 | Сряда | Сердика | Иван Петров | full | 60 |
+### Grid format
 
-- `date`: `DD.MM.YYYY` or `YYYY-MM-DD`
-- `restaurant`: matched to a Location by name (or set a `location_id` column to match by id)
-- `person`: employee name shown at the location
-- `shift type`: `full` / `evening` (Bulgarian aliases like `цяла` / `вечерна` also accepted)
+- **Row 1** — `ДАТА` in column A, then a **location name** at each block-start
+  column (Пирин, Гоце Делчев, Черковна, Студентски град, Студентски град 2, Младост).
+- **Row 2** — repeated sub-headers under each location: **СЛУЖИТЕЛИ** (employee) /
+  **СМЯНА** (payment) / **КОЛИ** (car). Each location block spans 3 columns + 1 spacer.
+- **Row 3+** — one **segment per calendar day**:
+  - a **day-of-month number** (e.g. `24`) heads the **day / full-shift** rows,
+  - a **weekday name** (`ПОНЕДЕЛНИК`…`НЕДЕЛЯ`) heads the **evening-shift** rows.
+- **Last row** — `ОБЩО`: weekly payment totals per location (ignored by the parser).
 
-The account that deployed the Apps Script must have read access to this spreadsheet.
+### How it is interpreted
 
-## Phase 2+ tabs (created as those features are built)
-`Cars`, `UsageHistory`, `Maintenance`, `Documents`, `Availability` — see the build
-spec sections §35, §45, §50, §18 for their column models.
+- **СМЯНА is the shift *payment*** (spec §57 `shift_payment`), not the shift type.
+  The `ОБЩО` row sums each location's СМЯНА column.
+- **Shift type** (`full` / `evening`) comes from which block a row sits in.
+- Entries are normalized **by weekday** (0=Sun…6=Sat), so the Home map matches
+  "who works where on date X" by X's weekday — no month/year needed.
+
+Normalized entry: `{ weekday, day_number, location_name, employee_name,
+shift_type, shift_start, shift_end, payment, car }`.

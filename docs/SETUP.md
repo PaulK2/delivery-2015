@@ -5,23 +5,37 @@ Two halves: the **backend** (Google Sheets + Apps Script) and the **frontend**
 
 ## 1. Backend — Google Sheets + Apps Script
 
-1. Create a new Google Spreadsheet (this becomes the data layer).
+The backend is a single file: **`backend/Backend.gs`**. It is bound to one
+spreadsheet (the "Fleet App Data" datastore) and reads a **separate, read-only**
+management schedule sheet.
+
+1. Create a new Google Spreadsheet — this becomes the datastore.
 2. **Extensions → Apps Script**. Delete the default `Code.gs`.
-3. Add every file from this repo's `backend/` folder as a matching `.gs` file
-   (`Code.gs`, `Config.gs`, `Utils.gs`, `Auth.gs`, `Locations.gs`, `Schedule.gs`, `Setup.gs`).
-4. In `Config.gs`, set `PIN_SALT` to a long random secret string.
-5. Run the `setup()` function once (select it in the editor, click **Run**, grant
-   permissions when prompted). This creates the tabs, seeds Settings, and creates a
-   first admin (`Администратор`, PIN `1234`).
-6. Change the admin PIN: in `Setup.gs`, set the constants in `setPin()` and Run it.
-   Add real employees with `addEmployee()`.
-7. **Deploy → New deployment → Web app**:
+3. Create a file and paste all of `backend/Backend.gs` into it. Save.
+4. Run the **`setup()`** function once (select it, click **Run**, grant
+   permissions). It:
+   - stores the datastore spreadsheet id in Script Properties,
+   - generates a random `PIN_SALT` in Script Properties (never in the frontend/repo),
+   - creates every tab (Employees, Locations, Sessions, Settings, Audit, Cars,
+     UsageHistory, Maintenance, Documents, Availability),
+   - seeds default Settings and a first admin: **`Администратор` / PIN `1234`**.
+5. Change the admin PIN and add employees (`setEmployeePinManual()` helper, or the
+   `saveEmployee` / `resetEmployeePin` admin API once the Admin UI lands).
+6. **Deploy → New deployment → Web app**:
    - Execute as: **Me**
-   - Who has access: **Anyone**
+   - Who has access: **Anyone**  ← the "even anonymous" option; required so the
+     browser can call it without a Google login.
    - Deploy, then copy the **Web app URL** (ends in `/exec`).
 
-> Re-deploy (New deployment, or Manage deployments → edit → new version) whenever you
-> change backend code, so the live URL serves the latest version.
+> Re-deploy (Manage deployments → edit → new version) after any backend change so
+> the live `/exec` URL serves the latest code.
+
+### Schedule source
+The weekly schedule is a **separate** Google Sheet. Set it either in-app
+(**График → Google Sheet за текущия график**, admin only) or by editing
+`INITIAL_SCHEDULE_URL` / running `setTestScheduleUrl()`. The deploying account must
+have **read** access to that sheet. The app **never writes** to it. See
+[SHEETS_SCHEMA.md](SHEETS_SCHEMA.md) for the grid format the parser expects.
 
 ## 2. Frontend — local development
 
@@ -31,25 +45,24 @@ cp .env.example .env.local   # put your /exec URL in VITE_API_URL
 npm run dev
 ```
 
-Open the printed localhost URL. Log in with an employee + PIN.
+Open the printed localhost URL and log in (employee + PIN).
 
-> If you don't set `VITE_API_URL`, log in as admin and set the backend URL in-app
-> once the Administration screen lands — for now it can be injected via
+> The Apps Script URL can also be overridden at runtime:
 > `localStorage.setItem('fv_api_url', '<your /exec url>')` in the browser console.
 
 ## 3. Deploy the frontend to GitHub Pages
 
-1. Push to `main`. The workflow in `.github/workflows/deploy.yml` builds and deploys.
-2. In the repo: **Settings → Pages → Build and deployment → Source: GitHub Actions**.
+1. Push to `main`; `.github/workflows/deploy.yml` builds and deploys.
+2. Repo **Settings → Pages → Source: GitHub Actions**.
 3. (Optional) Bake the backend URL in at build time: **Settings → Secrets and
    variables → Actions → Variables**, add `VITE_API_URL`.
 
 ### Custom domain
-Put a `CNAME` file containing your domain in `public/` (Vite copies it into the
-build), and configure the domain under **Settings → Pages → Custom domain**.
+Put a `CNAME` file with your domain in `public/` and set it under
+**Settings → Pages → Custom domain**.
 
 ## Notes
-- The Apps Script Web App URL is **not** a secret; secrets (`PIN_SALT`, PIN hashes)
-  stay inside Apps Script and never reach the browser.
-- CORS: the frontend sends `text/plain` POST bodies so the browser skips the preflight
-  that Apps Script Web Apps do not answer.
+- Secrets (`PIN_SALT`, PIN hashes) live only in Apps Script Script Properties —
+  never in the browser or the repo. The `/exec` URL itself is not a secret.
+- CORS: the frontend sends `text/plain` POST bodies so the browser skips the
+  preflight that Apps Script Web Apps do not answer.
