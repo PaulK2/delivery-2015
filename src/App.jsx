@@ -8,6 +8,7 @@ import SchedulePage from './pages/SchedulePage.jsx'
 import VehiclesPage from './pages/VehiclesPage.jsx'
 import VehicleDetailPage from './pages/VehicleDetailPage.jsx'
 import AvailabilityPage from './pages/AvailabilityPage.jsx'
+import MaintenancePage from './pages/MaintenancePage.jsx'
 import PlaceholderPage from './pages/PlaceholderPage.jsx'
 
 function RequireAuth({ children }) {
@@ -45,10 +46,7 @@ export default function App() {
         <Route path="/availability" element={<AvailabilityPage />} />
         <Route path="/vehicles" element={<VehiclesPage />} />
         <Route path="/vehicles/:carId" element={<VehicleDetailPage />} />
-        <Route
-          path="/maintenance"
-          element={<PlaceholderPage title="Сигнали и поддръжка" phase="Фаза 4" />}
-        />
+        <Route path="/maintenance" element={<MaintenancePage />} />
         <Route
           path="/admin"
           element={<PlaceholderPage title="Администрация" phase="Фаза 6" adminOnly />}

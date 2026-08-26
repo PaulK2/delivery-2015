@@ -29,8 +29,17 @@ export async function getCarUsageHistory(carId, limit) {
   return data?.history || []
 }
 
-// Active/all maintenance for a vehicle (read-only here; full flow is Phase 4).
+// Active/all maintenance for a vehicle.
 export async function getCarMaintenance(carId, status) {
   const data = await api('getMaintenance', { carId, status })
   return data?.maintenance || []
+}
+
+// Admin: restore a vehicle to service after maintenance (spec §40, §72). The backend
+// has no dedicated setCarStatus, so saveCar carries the status change while preserving
+// the other fields server-side.
+export async function restoreCarToService(car) {
+  return api('saveCar', {
+    car: { car_id: car.car_id, registration: car.registration, status: 'available' },
+  })
 }

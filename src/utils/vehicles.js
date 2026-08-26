@@ -17,9 +17,33 @@ export function carTitle(car) {
   return mm || car.registration || '—'
 }
 
-// Maintenance severity labels (spec §39) — used when showing active issues.
+// Maintenance severity (spec §39). Ordered most-severe first for sorting/forms.
 export const SEVERITY = {
-  low: { label: 'Ниско', cls: 'muted' },
-  medium: { label: 'Средно', cls: 'warn' },
-  critical: { label: 'Критично', cls: 'danger' },
+  critical: { label: 'Критично', cls: 'danger', rank: 0, hint: 'Автомобилът не трябва да се използва.' },
+  medium: { label: 'Средно', cls: 'warn', rank: 1, hint: 'Автомобилът се нуждае от внимание.' },
+  low: { label: 'Ниско', cls: 'muted', rank: 2, hint: 'Автомобилът може да се използва.' },
+}
+export const SEVERITY_ORDER = ['low', 'medium', 'critical']
+
+export function severityRank(s) {
+  return SEVERITY[s]?.rank ?? 9
+}
+
+// Maintenance categories (spec §38). Internal value → Bulgarian label.
+export const MAINTENANCE_CATEGORY = {
+  engine: 'Двигател',
+  tires: 'Гуми',
+  brakes: 'Спирачки',
+  lights: 'Светлини',
+  body: 'Купе',
+  interior: 'Интериор',
+  electronics: 'Електроника',
+  fluids: 'Течности',
+  documents: 'Документи',
+  other: 'Друг проблем',
+}
+export const CATEGORY_ORDER = Object.keys(MAINTENANCE_CATEGORY)
+
+export function categoryLabel(c) {
+  return MAINTENANCE_CATEGORY[c] || c || ''
 }

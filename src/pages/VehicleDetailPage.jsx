@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import {
   getCar,
@@ -6,13 +6,17 @@ import {
   releaseCar,
   getCarUsageHistory,
   getCarMaintenance,
+  restoreCarToService,
 } from '../services/fleet/fleet.js'
+import { reportIssue, resolveIssue } from '../services/maintenance/maintenance.js'
 import { useAuth } from '../context/AuthContext.jsx'
 import { useToast } from '../context/ToastContext.jsx'
-import { carTitle, SEVERITY } from '../utils/vehicles.js'
+import { carTitle, SEVERITY, severityRank, categoryLabel } from '../utils/vehicles.js'
 import { formatStampBG } from '../utils/datetime.js'
 import StatusBadge from '../components/StatusBadge.jsx'
 import ReleaseCarModal from '../components/ReleaseCarModal.jsx'
+import ReportIssueModal from '../components/ReportIssueModal.jsx'
+import ResolveIssueModal from '../components/ResolveIssueModal.jsx'
 import UsageHistoryList from '../components/UsageHistoryList.jsx'
 import Spinner from '../components/Spinner.jsx'
 
@@ -22,17 +26,19 @@ export default function VehicleDetailPage() {
   const { showToast } = useToast()
 
   const [car, setCar] = useState(null)
-  const [issues, setIssues] = useState([])
+  const [maintenance, setMaintenance] = useState([])
   const [history, setHistory] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [acting, setActing] = useState(false)
   const [showRelease, setShowRelease] = useState(false)
+  const [showReport, setShowReport] = useState(false)
+  const [resolving, setResolving] = useState(null) // issue being resolved, or null
 
   const loadCar = useCallback(async () => {
-    const [c, m] = await Promise.all([getCar(carId), getCarMaintenance(carId, 'open')])
+    const [c, m] = await Promise.all([getCar(carId), getCarMaintenance(carId)])
     setCar(c)
-    setIssues(m)
+    setMaintenance(m)
     return c
   }, [carId])
 
@@ -60,6 +66,21 @@ export default function VehicleDetailPage() {
     }
   }
 
+  const openIssues = useMemo(
+    () =>
+      maintenance
+        .filter((m) => m.status === 'open')
+        .sort((a, b) => severityRank(a.severity) - severityRank(b.severity)),
+    [maintenance]
+  )
+  const repairs = useMemo(
+    () =>
+      maintenance
+        .filter((m) => m.status === 'resolved')
+        .sort((a, b) => String(b.resolved_at).localeCompare(String(a.resolved_at))),
+    [maintenance]
+  )
+
   async function onTake() {
     setActing(true)
     try {
@@ -68,7 +89,7 @@ export default function VehicleDetailPage() {
       await refresh()
     } catch (e) {
       showToast(e.message || 'Възникна проблем.', 'error')
-      await refresh() // reflect the real current status after a failed race
+      await refresh()
     } finally {
       setActing(false)
     }
@@ -80,6 +101,52 @@ export default function VehicleDetailPage() {
       await releaseCar(carId, parkedLocation, notes)
       setShowRelease(false)
       showToast('Автомобилът е освободен.', 'success')
+      await refresh()
+    } catch (e) {
+      showToast(e.message || 'Възникна проблем.', 'error')
+    } finally {
+      setActing(false)
+    }
+  }
+
+  async function onReport(issue) {
+    setActing(true)
+    try {
+      await reportIssue({ carId, ...issue })
+      setShowReport(false)
+      showToast(
+        issue.severity === 'critical'
+          ? 'Проблемът е докладван. Автомобилът е маркиран като недостъпен.'
+          : 'Проблемът е докладван.',
+        'success'
+      )
+      await refresh()
+    } catch (e) {
+      showToast(e.message || 'Възникна проблем при докладването.', 'error')
+    } finally {
+      setActing(false)
+    }
+  }
+
+  async function onResolve(payload) {
+    setActing(true)
+    try {
+      await resolveIssue(payload)
+      setResolving(null)
+      showToast('Проблемът е отстранен.', 'success')
+      await refresh()
+    } catch (e) {
+      showToast(e.message || 'Възникна проблем.', 'error')
+    } finally {
+      setActing(false)
+    }
+  }
+
+  async function onRestore() {
+    setActing(true)
+    try {
+      await restoreCarToService(car)
+      showToast('Автомобилът е върнат в експлоатация.', 'success')
       await refresh()
     } catch (e) {
       showToast(e.message || 'Възникна проблем.', 'error')
@@ -139,10 +206,10 @@ export default function VehicleDetailPage() {
       </div>
 
       {/* Active issues — prominent (spec §41) */}
-      {issues.length > 0 ? (
+      {openIssues.length > 0 ? (
         <section className="issues-box">
           <h2 className="issues-box__title">⚠ Активни проблеми</h2>
-          {issues.map((it) => (
+          {openIssues.map((it) => (
             <div key={it.maintenance_id} className="issue">
               <div className="issue__head">
                 <span className="issue__name">{it.title}</span>
@@ -152,8 +219,18 @@ export default function VehicleDetailPage() {
               </div>
               {it.description ? <div className="issue__desc">{it.description}</div> : null}
               <div className="issue__meta">
-                Докладвано от: {it.reported_by_name || '—'} · {formatStampBG(it.reported_at)}
+                {categoryLabel(it.category)} · Докладвано от: {it.reported_by_name || '—'} ·{' '}
+                {formatStampBG(it.reported_at)}
               </div>
+              {isAdmin ? (
+                <button
+                  className="btn btn--ghost btn--sm issue__resolve"
+                  onClick={() => setResolving(it)}
+                  disabled={acting}
+                >
+                  Маркирай като отстранен
+                </button>
+              ) : null}
             </div>
           ))}
         </section>
@@ -185,6 +262,19 @@ export default function VehicleDetailPage() {
             Автомобилът е недостъпен{car.notes ? `: ${car.notes}` : ''}.
           </div>
         ) : null}
+        {isAdmin && car.status === 'maintenance' ? (
+          <button className="btn btn--ghost btn--block" onClick={onRestore} disabled={acting}>
+            Върни в експлоатация
+          </button>
+        ) : null}
+
+        <button
+          className="btn btn--ghost btn--block"
+          onClick={() => setShowReport(true)}
+          disabled={acting}
+        >
+          Докладвай проблем
+        </button>
       </div>
 
       {/* Usage history */}
@@ -197,10 +287,48 @@ export default function VehicleDetailPage() {
         )}
       </section>
 
+      {/* Repair history (spec §44) */}
+      <section className="detail-section">
+        <h2 className="detail-section__title">История на ремонти</h2>
+        {repairs.length === 0 ? (
+          <div className="empty-state empty-state--sm">Няма извършени ремонти.</div>
+        ) : (
+          <ul className="repair-list">
+            {repairs.map((r) => (
+              <li key={r.maintenance_id} className="repair-item">
+                <div className="repair-item__head">
+                  <span className="repair-item__title">{r.title}</span>
+                  <span className="repair-item__date">{formatStampBG(r.resolved_at).split(' ')[0]}</span>
+                </div>
+                <div className="repair-item__cat">
+                  {categoryLabel(r.category)} · докладвано {formatStampBG(r.reported_at).split(' ')[0]} от{' '}
+                  {r.reported_by_name || '—'}
+                </div>
+                {r.repair_description ? (
+                  <div className="repair-item__desc">{r.repair_description}</div>
+                ) : null}
+                <div className="repair-item__meta">
+                  {r.service ? <span>🔧 {r.service}</span> : null}
+                  {r.cost ? <span>💰 {r.cost} лв</span> : null}
+                  {r.resolved_by_name ? <span>✔ {r.resolved_by_name}</span> : null}
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
       {showRelease ? (
-        <ReleaseCarModal
-          onClose={() => setShowRelease(false)}
-          onSubmit={onRelease}
+        <ReleaseCarModal onClose={() => setShowRelease(false)} onSubmit={onRelease} submitting={acting} />
+      ) : null}
+      {showReport ? (
+        <ReportIssueModal onClose={() => setShowReport(false)} onSubmit={onReport} submitting={acting} />
+      ) : null}
+      {resolving ? (
+        <ResolveIssueModal
+          issue={resolving}
+          onClose={() => setResolving(null)}
+          onSubmit={onResolve}
           submitting={acting}
         />
       ) : null}
