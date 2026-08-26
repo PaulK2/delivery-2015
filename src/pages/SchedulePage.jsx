@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { getSchedule } from '../services/schedule/schedule.js'
 import { weekdayNameByIndex, WEEK_ORDER } from '../utils/datetime.js'
-import { shiftHours, shiftSortRank, SHIFT_LABELS } from '../utils/shifts.js'
+import { shiftHours, shiftSortRank, formatPayment, SHIFT_LABELS } from '../utils/shifts.js'
 import { useAuth } from '../context/AuthContext.jsx'
 import Spinner from '../components/Spinner.jsx'
 import ScheduleSourceConfig from '../components/ScheduleSourceConfig.jsx'
@@ -139,6 +139,9 @@ export default function SchedulePage() {
                     <span className="schedule-item__person">{e.employee_name}</span>
                     <span className="schedule-item__location">{e.location_name}</span>
                     {e.car ? <span className="schedule-item__car">{e.car}</span> : null}
+                    {formatPayment(e.payment) ? (
+                      <span className="schedule-item__pay">{formatPayment(e.payment)}</span>
+                    ) : null}
                     <span className="schedule-item__hours">{shiftHours(e.shift_type)}</span>
                   </li>
                 ))}

@@ -1420,3 +1420,22 @@ textarea.input {
     font-size: 12px;
   }
 }
+
+/* Payment display (СМЯНА) */
+.schedule-item__pay {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--ok);
+  background: #ecfdf5;
+  border: 1px solid #a7f3d0;
+  border-radius: 6px;
+  padding: 2px 6px;
+  white-space: nowrap;
+}
+.employee-row__pay {
+  color: var(--ok);
+  font-weight: 600;
+}
+.employee-row__car {
+  color: var(--muted);
+}

@@ -1,5 +1,5 @@
 import { formatDateBG } from '../utils/datetime.js'
-import { shiftSortRank, shiftHours, SHIFT_BADGES } from '../utils/shifts.js'
+import { shiftSortRank, shiftHours, formatPayment, SHIFT_BADGES } from '../utils/shifts.js'
 
 // Location details panel (spec §8). Employees sorted full-day before evening.
 export default function LocationDetailPanel({ location, entries, date, onClose }) {
@@ -42,7 +42,13 @@ export default function LocationDetailPanel({ location, entries, date, onClose }
               >
                 {SHIFT_BADGES[e.shift_type]}
               </span>
-              <span className="employee-row__hours">{shiftHours(e.shift_type)}</span>
+              <span className="employee-row__hours">
+                {shiftHours(e.shift_type)}
+                {formatPayment(e.payment) ? (
+                  <span className="employee-row__pay"> · {formatPayment(e.payment)}</span>
+                ) : null}
+                {e.car ? <span className="employee-row__car"> · {e.car}</span> : null}
+              </span>
             </li>
           ))}
         </ul>
