@@ -33,13 +33,13 @@ export const FLEET_CATALOG = {
   CB4349CB: { make: 'Toyota', model: 'Aygo' },
   CB2587CH: { make: 'Peugeot', model: '107' },
   CB9221CT: { make: 'Peugeot', model: '107' },
+  CB1060BH: { make: 'Peugeot', model: '107' },
+  CB5737PX: { make: 'Peugeot', model: '107' },
   CB2804TA: { make: 'Citroen', model: 'C1' },
   CB9206AP: { make: 'Opel', model: 'Astra' },
   CB3259KC: { make: 'Seat', model: 'Ibiza' },
-  // Clones of CB0254CO (Citroen C1) — same vehicle, reused photo.
-  CB1060BN: { make: 'Citroen', model: 'C1' },
+  // Clone of CB0254CO (Citroen C1) — same vehicle, reused photo.
   CB6300KM: { make: 'Citroen', model: 'C1' },
-  CB5737PX: { make: 'Citroen', model: 'C1' },
 }
 
 function catalogEntry(car) {
