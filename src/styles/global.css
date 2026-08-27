@@ -6,6 +6,8 @@
 :root {
   --accent: #ff5008;
   --accent-dark: #e94705;
+  /* Bright red used only on the login card's name picker. */
+  --accent-login: #ff1a1a;
   /* Soft accent wash for tints/active states (replaces old orange pastels). */
   --accent-bg: #fff1ec;
   --accent-border: #ffd8c8;
@@ -329,7 +331,8 @@ button {
 }
 .app-header__name {
   font-size: 14px;
-  color: var(--text-2);
+  font-weight: 700;
+  color: var(--accent);
   max-width: 40vw;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -494,6 +497,46 @@ button {
   color: var(--muted);
   font-size: 13px;
   margin: 0;
+}
+/* Employee name picker: minimalistic and centered — a hollow ("empty inside")
+   transparent box with just an underline, and bright-red bold names. The selected
+   value is centered via text-align-last; option colouring is honoured by
+   Chromium/Firefox on desktop. */
+.login-select {
+  font-weight: 700;
+  color: var(--accent-login);
+  background: transparent;
+  border: none;
+  border-bottom: 1.5px solid var(--border);
+  border-radius: 0;
+  text-align: center;
+  text-align-last: center;
+  padding: 11px 8px;
+}
+.login-select:focus {
+  outline: none;
+  border-bottom-color: var(--accent-login);
+  box-shadow: none;
+}
+.login-select option {
+  font-weight: 700;
+  color: var(--accent-login);
+  background: var(--surface);
+  text-align: center;
+}
+/* Keep the neutral placeholder ("— Изберете —") from taking the accent — both in
+   the open list and in the closed box while no name is chosen yet. */
+.login-select option[value=''] {
+  font-weight: 500;
+  color: var(--text-2);
+}
+.login-select:has(option[value='']:checked) {
+  font-weight: 500;
+  color: var(--text-2);
+}
+/* Center the login form's field labels to match the centered dropdown. */
+.login-form .field__label {
+  text-align: center;
 }
 
 /* ---------- Home / map ---------- */
@@ -726,7 +769,9 @@ button {
 }
 .employee-row__name {
   grid-area: name;
-  font-weight: 600;
+  font-weight: 700;
+  color: var(--accent);
+  letter-spacing: 0.01em;
 }
 .employee-row__hours {
   grid-area: hours;
@@ -830,7 +875,8 @@ button {
   border-left-color: var(--evening);
 }
 .schedule-item__person {
-  font-weight: 600;
+  font-weight: 700;
+  color: var(--accent);
   min-width: 120px;
 }
 .schedule-item__location {
@@ -848,6 +894,17 @@ button {
   border-radius: 6px;
   padding: 2px 6px;
   white-space: nowrap;
+}
+/* When the plate maps to a real car the note becomes a tappable link to its card. */
+a.schedule-item__car--link {
+  color: var(--accent);
+  border-color: var(--accent-border);
+  background: var(--accent-bg);
+  text-decoration: none;
+  cursor: pointer;
+}
+a.schedule-item__car--link:hover {
+  border-color: var(--accent);
 }
 .schedule-item__hours {
   font-size: 13px;
@@ -1151,6 +1208,11 @@ button {
   color: var(--text-2);
   margin-top: 2px;
 }
+/* Employee-name emphasis inside meta lines ("in use by", parked-by, etc.). */
+.who-name {
+  font-weight: 700;
+  color: var(--accent);
+}
 
 /* Actions */
 .vehicle-actions {
@@ -1189,6 +1251,7 @@ button {
 }
 .issue__name {
   font-weight: 700;
+  color: var(--accent);
 }
 .issue__desc {
   font-size: 14px;
@@ -1252,7 +1315,8 @@ button {
   gap: 8px;
 }
 .usage-item__driver {
-  font-weight: 600;
+  font-weight: 700;
+  color: var(--accent);
 }
 .usage-item__date {
   font-size: 13px;
@@ -1486,9 +1550,14 @@ textarea.input {
   position: sticky;
   left: 0;
   background: var(--surface);
-  font-weight: 600;
+  font-weight: 700;
+  color: var(--text);
   white-space: nowrap;
   box-shadow: 1px 0 0 var(--border);
+}
+/* Employee-name cells (not the "Служител" header) in brand accent so they pop. */
+.matrix__name {
+  color: var(--accent);
 }
 .matrix thead th {
   background: var(--surface-2);
@@ -2044,6 +2113,7 @@ textarea.input {
 }
 .admin-row__name {
   font-weight: 700;
+  color: var(--accent);
   display: flex;
   align-items: center;
   gap: 8px;

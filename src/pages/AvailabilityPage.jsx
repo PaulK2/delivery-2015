@@ -10,7 +10,7 @@ import {
 import { getEmployees } from '../services/employees/employees.js'
 import { useAuth } from '../context/AuthContext.jsx'
 import { useToast } from '../context/ToastContext.jsx'
-import { formatDateBG } from '../utils/datetime.js'
+import { formatDateBG, todayISO, weekdayIndex } from '../utils/datetime.js'
 import DayShiftSelector from '../components/DayShiftSelector.jsx'
 import TeamAvailabilityMatrix from '../components/TeamAvailabilityMatrix.jsx'
 import AdminAvailabilityPanel from '../components/AdminAvailabilityPanel.jsx'
@@ -114,6 +114,13 @@ export default function AvailabilityPage() {
   }
 
   const open = status.open
+
+  // Regular users can request/edit shifts only until 00:00 Saturday. On Saturday and
+  // Sunday their requests are locked. Admins are not subject to this weekend lock.
+  const weekday = weekdayIndex(todayISO()) // 0=Sun … 6=Sat
+  const weekendLocked = !isAdmin && (weekday === 6 || weekday === 0)
+  const canEdit = open && !weekendLocked
+
   const weekLabel =
     dates.length === 7 ? `${formatDateBG(dates[0])} – ${formatDateBG(dates[6])}` : ''
 
@@ -122,10 +129,12 @@ export default function AvailabilityPage() {
       <h1 className="page__title">Следваща седмица</h1>
       <p className="page__subtitle">Наличност за седмица {weekLabel}</p>
 
-      <div className={'banner ' + (open ? 'banner--ok' : 'banner--warn')}>
-        {open
-          ? 'Приемът на наличност е отворен. Изберете кога сте на разположение.'
-          : 'Приемът на наличност е затворен. Можете само да преглеждате.'}
+      <div className={'banner ' + (canEdit ? 'banner--ok' : 'banner--warn')}>
+        {weekendLocked
+          ? 'Заявките за смени вече не могат да се редактират — приемът е заключен за събота и неделя.'
+          : open
+            ? 'Приемът на наличност е отворен. Изберете кога сте на разположение.'
+            : 'Приемът на наличност е затворен. Можете само да преглеждате.'}
       </div>
 
       {/* My availability editor */}
@@ -137,23 +146,25 @@ export default function AvailabilityPage() {
               key={d}
               date={d}
               value={mine[d]}
-              disabled={!open}
+              disabled={!canEdit}
               onChange={(v) => setMine((m) => ({ ...m, [d]: v }))}
             />
           ))}
         </div>
-        {open ? (
+        {canEdit ? (
           <button className="btn btn--primary btn--block" onClick={onSave} disabled={saving}>
             {saving ? 'Записване…' : 'Запази наличността'}
           </button>
         ) : null}
       </section>
 
-      {/* Team overview */}
-      <section className="detail-section">
-        <h2 className="detail-section__title">Наличност на екипа</h2>
-        <TeamAvailabilityMatrix employees={employees} availability={availability} dates={dates} />
-      </section>
+      {/* Team overview — the full list of everyone's requests is admin-only. */}
+      {isAdmin ? (
+        <section className="detail-section">
+          <h2 className="detail-section__title">Наличност на екипа</h2>
+          <TeamAvailabilityMatrix employees={employees} availability={availability} dates={dates} />
+        </section>
+      ) : null}
 
       {/* Admin controls */}
       {isAdmin ? (

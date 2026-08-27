@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { NavLink, Outlet } from 'react-router-dom'
+import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext.jsx'
 import { CONFIG } from '../config/index.js'
 import { getLocations, getSchedule } from '../services/schedule/schedule.js'
@@ -16,6 +16,10 @@ const norm = (s) => (s || '').toString().trim().toLowerCase()
 export default function Layout() {
   const { user, isAdmin, logout } = useAuth()
   const items = NAV_ITEMS.filter((i) => !i.adminOnly || isAdmin)
+
+  // The main (map) page shows the day/date on the map itself, so we hide the top-bar
+  // date there to avoid displaying it twice; every other page shows it in the top bar.
+  const isHome = useLocation().pathname === '/'
 
   // Schedule + locations are loaded once here (Layout stays mounted across routes)
   // and shared with pages via Outlet context, so the top bar and the Home map use
@@ -71,15 +75,17 @@ export default function Layout() {
       <header className="app-header">
         <div className="app-header__brand">
           <span className="app-header__logo">
-            <Icon name="truck" size={24} />
+            <Icon name="car" size={24} />
           </span>
           <span className="app-header__title">{CONFIG.appName}</span>
         </div>
 
         <div className="app-header__shift" aria-label="Смяна за днес">
-          <span className="app-header__shift-date">
-            {weekdayBG(todayIso)}, {formatDateBG(todayIso)}
-          </span>
+          {!isHome ? (
+            <span className="app-header__shift-date">
+              {weekdayBG(todayIso)}, {formatDateBG(todayIso)}
+            </span>
+          ) : null}
           <span
             className={
               'app-header__shift-work' + (todayShift ? '' : ' app-header__shift-work--off')

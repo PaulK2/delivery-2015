@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useOutletContext } from 'react-router-dom'
+import { useAuth } from '../context/AuthContext.jsx'
 import { todayISO, weekdayIndex, shiftISO, weekdayBG, formatDateBG } from '../utils/datetime.js'
 import SofiaMap from '../components/SofiaMap.jsx'
 import LocationDetailPanel from '../components/LocationDetailPanel.jsx'
@@ -7,10 +8,13 @@ import Icon from '../components/Icon.jsx'
 import Spinner from '../components/Spinner.jsx'
 
 const norm = (s) => (s || '').toString().trim().toLowerCase()
+// Case- and space-insensitive name key (so "Иван  Петров" == "иванпетров").
+const nameKey = (s) => String(s || '').toLowerCase().replace(/\s+/g, '')
 
 export default function HomePage() {
   // Schedule + locations (and today's shift) come from Layout via Outlet context.
   const { locations, schedule, loading, error, reload, todayShift } = useOutletContext()
+  const { user } = useAuth()
   const [date, setDate] = useState(todayISO())
   const [selectedId, setSelectedId] = useState(null)
   const [autoFocused, setAutoFocused] = useState(false)
@@ -53,10 +57,21 @@ export default function HomePage() {
 
   const selectedLocation = locations.find((l) => l.location_id === selectedId) || null
 
-  // Focus the map on today's restaurant (if it has coordinates); else stay zoomed out.
+  // The logged-in user's restaurant for the currently VIEWED date (not just today):
+  // matched by name against that day's schedule entries.
+  const myShiftLocation = useMemo(() => {
+    if (!user) return null
+    const key = nameKey(user.name)
+    const mine = entriesForDate.find((e) => nameKey(e.employee_name) === key)
+    if (!mine) return null
+    return locations.find((l) => norm(l.name) === norm(mine.location_name)) || null
+  }, [entriesForDate, locations, user])
+
+  // Focus the map on the viewed day's restaurant (if it has coordinates). When the
+  // user has no shift that day, focus is null and the map returns to the zoomed-out view.
   const focus =
-    todayShift?.location && todayShift.location.latitude != null
-      ? [Number(todayShift.location.latitude), Number(todayShift.location.longitude)]
+    myShiftLocation && myShiftLocation.latitude != null
+      ? [Number(myShiftLocation.latitude), Number(myShiftLocation.longitude)]
       : null
 
   // On first load, also select today's restaurant so the side panel opens on it.

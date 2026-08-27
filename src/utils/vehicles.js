@@ -20,6 +20,7 @@ export const FLEET_CATALOG = {
   CB0254CO: { make: 'Citroen', model: 'C1' },
   CB3989KO: { make: 'Citroen', model: 'C1' },
   CB8361CH: { make: 'Citroen', model: 'C1' },
+  CB1975BE: { make: 'Citroen', model: 'C1' },
   CB0668CC: { make: 'Seat', model: 'Ibiza' },
   CB1950TP: { make: 'Chevrolet', model: 'Aveo' },
   CB2333CP: { make: 'Peugeot', model: '107' },
@@ -27,6 +28,18 @@ export const FLEET_CATALOG = {
   CB0927AA: { make: 'Renault', model: 'Scenic' },
   CB7052CB: { make: 'Renault', model: 'Clio' },
   CB7920BC: { make: 'Renault', model: 'Clio' },
+  // Newly photographed vehicles (brand/model read from the photos).
+  CB0065TM: { make: 'Toyota', model: 'Aygo' },
+  CB4349CB: { make: 'Toyota', model: 'Aygo' },
+  CB2587CH: { make: 'Peugeot', model: '107' },
+  CB9221CT: { make: 'Peugeot', model: '107' },
+  CB2804TA: { make: 'Citroen', model: 'C1' },
+  CB9206AP: { make: 'Opel', model: 'Astra' },
+  CB3259KC: { make: 'Seat', model: 'Ibiza' },
+  // Clones of CB0254CO (Citroen C1) — same vehicle, reused photo.
+  CB1060BN: { make: 'Citroen', model: 'C1' },
+  CB6300KM: { make: 'Citroen', model: 'C1' },
+  CB5737PX: { make: 'Citroen', model: 'C1' },
 }
 
 function catalogEntry(car) {
@@ -87,6 +100,47 @@ export function carPhoto(car) {
   if (car?.image) return car.image
   const plate = normalizePlate(car?.registration)
   return CAR_PHOTO_PLATES.has(plate) ? `${import.meta.env.BASE_URL}cars/${plate}.png` : null
+}
+
+// Bulgarian plates only use the twelve letters shared by the Cyrillic and Latin
+// alphabets. After normalizePlate() folds everything to Latin, a valid plate token
+// is 1–2 of these letters, four digits, then 0–2 of these letters. Restricting the
+// letter class to this set makes the extractor stop at noise words ("резерва",
+// "note", …) instead of swallowing them.
+const PLATE_LETTERS = 'ABEKMHOPCTYX'
+const PLATE_TOKEN_RE = new RegExp(
+  `([${PLATE_LETTERS}]{1,2})([0-9]{4})([${PLATE_LETTERS}]{0,2})`
+)
+
+// Pull the registration plate out of a free-text schedule note and match it to a
+// real car, tolerating extra text and truncation. `known` is a list of
+// { car_id, plate } where `plate` has already been run through normalizePlate().
+//
+// Returns { plate, carId, completed } — carId is null when a plate-like token was
+// found but matches no (single) car; completed is true when we filled in missing
+// trailing characters. Returns null when there is no plate-like token at all.
+export function resolveScheduleCar(rawCar, known) {
+  const folded = normalizePlate(rawCar) // Cyrillic→Latin, upper-cased, spaces stripped
+  const m = folded.match(PLATE_TOKEN_RE)
+  if (!m) return null
+
+  const cand = m[1] + m[2] + m[3]
+  const coreLen = m[1].length + 4 // region letters + the four digits (the identifier)
+
+  // Walk from the fullest candidate down to just region+digits. A car matches when
+  // the candidate is a prefix of its plate with at most two characters missing.
+  for (let len = cand.length; len >= coreLen; len--) {
+    const sub = cand.slice(0, len)
+    const hits = (known || []).filter(
+      (k) => k.plate && k.plate.startsWith(sub) && k.plate.length - sub.length <= 2
+    )
+    if (hits.length === 1) {
+      return { plate: hits[0].plate, carId: hits[0].car_id, completed: hits[0].plate !== cand }
+    }
+    if (hits.length > 1) break // ambiguous — a shorter prefix only matches more cars
+  }
+
+  return { plate: cand, carId: null, completed: false } // plate-like, but no unique car
 }
 
 // The special built-in "own car" (spec: собствена кола).

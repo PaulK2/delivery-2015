@@ -1,16 +1,46 @@
 import { useEffect, useMemo, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { getSchedule } from '../services/schedule/schedule.js'
+import { getCars } from '../services/fleet/fleet.js'
 import { weekdayNameByIndex, WEEK_ORDER } from '../utils/datetime.js'
 import { shiftHours, shiftSortRank, formatPayment, SHIFT_LABELS } from '../utils/shifts.js'
+import { normalizePlate, resolveScheduleCar } from '../utils/vehicles.js'
 import { useAuth } from '../context/AuthContext.jsx'
 import Spinner from '../components/Spinner.jsx'
 import ScheduleSourceConfig from '../components/ScheduleSourceConfig.jsx'
 
 const uniqSorted = (arr) => [...new Set(arr.filter(Boolean))].sort((a, b) => a.localeCompare(b, 'bg'))
 
+// The car note on a schedule row: extract just the plate, link it to the car's card
+// when it maps to a real vehicle, and auto-complete truncated plates. Renders nothing
+// when the note is empty or contains no plate-like token.
+function ScheduleCar({ rawCar, known }) {
+  const resolved = useMemo(() => resolveScheduleCar(rawCar, known), [rawCar, known])
+  if (!resolved) return null
+
+  if (resolved.carId) {
+    return (
+      <Link
+        to={`/vehicles/${resolved.carId}`}
+        className="schedule-item__car schedule-item__car--link"
+        title={
+          resolved.completed
+            ? `Автоматично разпознат автомобил: ${resolved.plate}`
+            : `Отвори картона на ${resolved.plate}`
+        }
+      >
+        🚗 {resolved.plate}
+      </Link>
+    )
+  }
+  // Plate-like text but no matching car — still show only the cleaned plate.
+  return <span className="schedule-item__car">{resolved.plate}</span>
+}
+
 export default function SchedulePage() {
   const { isAdmin } = useAuth()
   const [data, setData] = useState({ entries: [], locationNames: [], configured: true, sheetName: '' })
+  const [cars, setCars] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [filters, setFilters] = useState({ employee: '', location: '', shift: '' })
@@ -18,14 +48,26 @@ export default function SchedulePage() {
   async function load() {
     setLoading(true)
     setError('')
-    try {
-      setData(await getSchedule())
-    } catch (e) {
-      setError(e.message || 'Графикът не може да бъде зареден.')
-    } finally {
-      setLoading(false)
+    // Cars are best-effort: the schedule must still render (with cleaned, unlinked
+    // plates) even if the fleet list can't be loaded.
+    const [sch, carRes] = await Promise.allSettled([getSchedule(), getCars()])
+    if (carRes.status === 'fulfilled') setCars(carRes.value)
+    if (sch.status === 'fulfilled') {
+      setData(sch.value)
+    } else {
+      setError(sch.reason?.message || 'Графикът не може да бъде зареден.')
     }
+    setLoading(false)
   }
+
+  // Known cars keyed by normalized plate, for linking schedule notes to car cards.
+  const knownCars = useMemo(
+    () =>
+      cars
+        .map((c) => ({ car_id: c.car_id, plate: normalizePlate(c.registration) }))
+        .filter((k) => k.plate),
+    [cars]
+  )
 
   useEffect(() => {
     load()
@@ -138,7 +180,7 @@ export default function SchedulePage() {
                   >
                     <span className="schedule-item__person">{e.employee_name}</span>
                     <span className="schedule-item__location">{e.location_name}</span>
-                    {e.car ? <span className="schedule-item__car">{e.car}</span> : null}
+                    <ScheduleCar rawCar={e.car} known={knownCars} />
                     {formatPayment(e.payment) ? (
                       <span className="schedule-item__pay">{formatPayment(e.payment)}</span>
                     ) : null}

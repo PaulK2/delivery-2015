@@ -3,16 +3,21 @@ import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet'
 import L from 'leaflet'
 import { CONFIG } from '../config/index.js'
 
-// Pans/zooms the map to a focus point (e.g. the user's restaurant today). When focus
-// is cleared the map keeps its current (default, zoomed-out) view.
-function FocusController({ focus, zoom }) {
+// Pans/zooms the map to a focus point (the user's restaurant for the viewed day).
+// When focus is cleared — the user has no shift that day — the map flies back to the
+// default zoomed-out view so it always reflects the currently viewed date.
+function FocusController({ focus, zoom, defaultCenter, defaultZoom }) {
   const map = useMap()
   const lat = focus?.[0]
   const lng = focus?.[1]
   useEffect(() => {
     if (lat != null && lng != null) {
       map.flyTo([lat, lng], zoom, { duration: 0.8 })
+    } else {
+      map.flyTo(defaultCenter, defaultZoom, { duration: 0.8 })
     }
+    // defaultCenter/defaultZoom are stable config constants — intentionally omitted.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lat, lng, zoom, map])
   return null
 }
@@ -43,7 +48,12 @@ export default function SofiaMap({ locations, countsByLocation, selectedId, onSe
       className="sofia-map"
     >
       <TileLayer url={CONFIG.map.tileUrl} attribution={CONFIG.map.tileAttribution} />
-      <FocusController focus={focus} zoom={CONFIG.map.focusZoom || 15} />
+      <FocusController
+        focus={focus}
+        zoom={CONFIG.map.focusZoom || 15}
+        defaultCenter={center}
+        defaultZoom={CONFIG.map.defaultZoom}
+      />
       {locations.map((loc) => {
         if (loc.latitude == null || loc.longitude == null) return null
         const count = countsByLocation[loc.location_id] || 0

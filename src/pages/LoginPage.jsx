@@ -62,10 +62,10 @@ export default function LoginPage() {
       <div className="login-card">
         <div className="login-card__brand">
           <span className="login-card__logo">
-            <Icon name="truck" size={44} />
+            <Icon name="car" size={44} />
           </span>
           <h1>{CONFIG.appName}</h1>
-          <p className="login-card__org">{CONFIG.organization}</p>
+          <p className="login-card__org">вход:</p>
         </div>
 
         {loadError ? (
@@ -79,7 +79,7 @@ export default function LoginPage() {
             <label className="field">
               <span className="field__label">Изберете служител</span>
               <select
-                className="input"
+                className="input login-select"
                 value={employeeId}
                 onChange={(e) => onSelectEmployee(e.target.value)}
                 autoComplete="username"

@@ -32,7 +32,7 @@ export default function VehicleCard({ car }) {
         </div>
 
         {car.status === 'in_use' && car.current_driver_name ? (
-          <div className="vehicle-card__meta">👤 {car.current_driver_name}</div>
+          <div className="vehicle-card__meta">👤 <span className="who-name">{car.current_driver_name}</span></div>
         ) : car.status === 'available' && car.parked_location ? (
           <div className="vehicle-card__meta">📍 {car.parked_location}</div>
         ) : car.status === 'maintenance' && car.notes ? (

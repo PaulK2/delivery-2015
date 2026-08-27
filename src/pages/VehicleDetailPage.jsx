@@ -246,7 +246,7 @@ export default function VehicleDetailPage() {
             {oil.due ? <span className="oil-badge" title="Нужна е смяна на масло">🛢 Масло</span> : null}
           </div>
           {car.status === 'in_use' && car.current_driver_name ? (
-            <div className="vehicle-hero__meta">👤 {car.current_driver_name}</div>
+            <div className="vehicle-hero__meta">👤 <span className="who-name">{car.current_driver_name}</span></div>
           ) : car.status === 'available' && car.parked_location ? (
             <div className="vehicle-hero__meta">📍 Паркиран: {car.parked_location}</div>
           ) : null}
