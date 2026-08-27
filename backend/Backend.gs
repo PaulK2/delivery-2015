@@ -654,12 +654,16 @@ function getEmployeesForLogin() {
 
     .map(function(employee) {
 
+      var isAdmin = String(employee.role) === 'admin';
+
       return {
         employee_id: employee.employee_id,
         name: employee.name,
-        // Whether this user has already set a personal password. When false, the
-        // login screen shows the first-time "create password" flow instead.
-        password_configured: isConfiguredFlag(employee.password_configured)
+        // Only administrators authenticate with a password. Regular staff log in with
+        // just their name. For admins, password_configured=false means the login screen
+        // shows the first-time "create password" flow.
+        requires_password: isAdmin,
+        password_configured: isAdmin && isConfiguredFlag(employee.password_configured)
       };
     });
 
@@ -923,42 +927,47 @@ function login(params) {
     return fail('employee_inactive');
   }
 
-  var configured = isConfiguredFlag(employee.password_configured);
+  // Only administrators authenticate with a password. Regular staff sign in simply by
+  // selecting their name — no credential required.
+  if (String(employee.role) === 'admin') {
 
-  if (!configured) {
+    var configured = isConfiguredFlag(employee.password_configured);
 
-    // First login: establish the user's own password now, then log them in.
-    if (!password || String(password).length < MIN_PASSWORD_LEN) {
-      return fail('weak_password');
-    }
+    if (!configured) {
 
-    var sheet = getTab(TABS.EMPLOYEES);
+      // First admin login: establish the user's own password now, then log them in.
+      if (!password || String(password).length < MIN_PASSWORD_LEN) {
+        return fail('weak_password');
+      }
 
-    setRowCells(sheet, employee.__row, {
-      password_hash: hashPassword(String(password)),
-      password_configured: true
-    });
+      var sheet = getTab(TABS.EMPLOYEES);
 
-    audit(
-      publicUser(employee),
-      'password_created',
-      'employee',
-      employee.employee_id,
-      ''
-    );
+      setRowCells(sheet, employee.__row, {
+        password_hash: hashPassword(String(password)),
+        password_configured: true
+      });
 
-  } else {
+      audit(
+        publicUser(employee),
+        'password_created',
+        'employee',
+        employee.employee_id,
+        ''
+      );
 
-    // Normal login: verify the previously set password.
-    if (!password) {
-      return fail('validation');
-    }
+    } else {
 
-    if (
-      hashPassword(String(password)) !==
-      String(employee.password_hash)
-    ) {
-      return fail('invalid_credentials');
+      // Normal admin login: verify the previously set password.
+      if (!password) {
+        return fail('validation');
+      }
+
+      if (
+        hashPassword(String(password)) !==
+        String(employee.password_hash)
+      ) {
+        return fail('invalid_credentials');
+      }
     }
   }
 
@@ -3551,14 +3560,15 @@ function nameKeyBG(value) {
  *
  * It:
  *   1. adds the password_hash / password_configured columns if missing;
- *   2. forces EVERY user to set a personal password on next login (clears any hash,
- *      password_configured = false) — no shared/default password survives;
- *   3. promotes the named real users to the 'admin' role, creating ЦЕЦО / СИМО if
+ *   2. promotes the named real users to the 'admin' role, creating ЦЕЦО / СИМО if
  *      they don't exist yet;
+ *   3. makes each admin set a password on their next login (only if they don't
+ *      already have one) — regular staff keep logging in with just their name;
  *   4. deactivates and demotes the generic shared 'Администратор' account.
  *
- * Existing employee rows (and their IDs, referenced by usage/maintenance/availability/
- * audit history) are updated in place — never recreated.
+ * Only ADMINISTRATORS use passwords. Regular employees are not touched and log in
+ * freely by selecting their name. Existing employee rows (and their IDs, referenced by
+ * usage/maintenance/availability/audit history) are updated in place — never recreated.
  */
 function migrateAdminsAndAuth() {
 
@@ -3568,15 +3578,7 @@ function migrateAdminsAndAuth() {
   ensureColumn(sheet, 'password_hash');
   ensureColumn(sheet, 'password_configured');
 
-  // 2) Reset everyone to "must set a personal password on next login".
-  readObjects(TABS.EMPLOYEES).forEach(function(e) {
-    setRowCells(sheet, e.__row, {
-      password_hash: '',
-      password_configured: false
-    });
-  });
-
-  // 3) Promote named admins; create the ones that must exist.
+  // 2) Promote named admins; create the ones that must exist.
   var byKey = {};
   readObjects(TABS.EMPLOYEES).forEach(function(e) {
     byKey[nameKeyBG(e.name)] = e;
@@ -3602,6 +3604,17 @@ function migrateAdminsAndAuth() {
         active: true
       });
       Logger.log('Created admin: ' + name + ' (' + id + ')');
+    }
+  });
+
+  // 3) Every admin who hasn't set a password yet must create one on next login.
+  //    (Idempotent: an admin who already configured a password is left alone.)
+  readObjects(TABS.EMPLOYEES).forEach(function(e) {
+    if (String(e.role) === 'admin' && !isConfiguredFlag(e.password_configured)) {
+      setRowCells(sheet, e.__row, {
+        password_hash: '',
+        password_configured: false
+      });
     }
   });
 

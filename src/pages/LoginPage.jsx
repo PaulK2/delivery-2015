@@ -33,8 +33,10 @@ export default function LoginPage() {
   if (isAuthenticated) return <Navigate to="/" replace />
 
   const selected = employees?.find((emp) => emp.employee_id === employeeId)
-  // First login: the user has no password yet and must create one now.
-  const firstTime = !!selected && selected.password_configured === false
+  // Only administrators sign in with a password; regular staff just pick their name.
+  const needsPassword = !!selected?.requires_password
+  // First admin login: no password set yet — create one now.
+  const firstTime = needsPassword && selected.password_configured === false
 
   function onSelectEmployee(id) {
     setEmployeeId(id)
@@ -47,18 +49,21 @@ export default function LoginPage() {
     e.preventDefault()
     setError('')
     if (!employeeId) return setError('Изберете служител.')
-    if (!password) return setError('Въведете парола.')
 
-    if (firstTime) {
-      if (password.length < MIN_PASSWORD_LEN)
-        return setError(`Паролата трябва да е поне ${MIN_PASSWORD_LEN} символа.`)
-      if (password !== confirm) return setError('Паролите не съвпадат.')
+    if (needsPassword) {
+      if (!password) return setError('Въведете парола.')
+      if (firstTime) {
+        if (password.length < MIN_PASSWORD_LEN)
+          return setError(`Паролата трябва да е поне ${MIN_PASSWORD_LEN} символа.`)
+        if (password !== confirm) return setError('Паролите не съвпадат.')
+      }
     }
 
     setSubmitting(true)
     try {
-      // For a first login this same call sets the chosen password server-side.
-      await login(employeeId, password)
+      // Regular staff send no password; for a first admin login this same call sets
+      // the chosen password server-side.
+      await login(employeeId, needsPassword ? password : '')
       navigate('/', { replace: true })
     } catch (err) {
       setError(err.message || 'Входът е неуспешен.')
@@ -105,11 +110,11 @@ export default function LoginPage() {
               </select>
             </label>
 
-            {selected ? (
+            {needsPassword ? (
               <>
                 {firstTime ? (
                   <p className="login-card__hint">
-                    Първо влизане: създайте своя парола.
+                    Първо влизане на администратор: създайте своя парола.
                   </p>
                 ) : null}
 

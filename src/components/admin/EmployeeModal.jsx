@@ -45,11 +45,11 @@ export default function EmployeeModal({ employee, onClose, onSubmit, submitting 
           <option value="admin">Администратор</option>
         </select>
       </label>
-      {isNew ? (
-        <p className="field__hint">
-          Служителят създава своя парола при първото си влизане.
-        </p>
-      ) : null}
+      <p className="field__hint">
+        {role === 'admin'
+          ? 'Администраторът създава своя парола при първото си влизане.'
+          : 'Служителите влизат само с името си — без парола.'}
+      </p>
       <label className="checkbox">
         <input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} />
         <span>Активен</span>
