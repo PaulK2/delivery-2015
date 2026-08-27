@@ -35,6 +35,11 @@
 var TIMEZONE = 'Europe/Sofia';
 var SESSION_TTL_DAYS = 30;
 
+// Bump on every meaningful backend change. Visible via doGet (open the /exec URL in a
+// browser) so you can confirm which code the DEPLOYED web app is actually running —
+// Apps Script serves the last DEPLOYED VERSION, not merely the saved script.
+var BACKEND_VERSION = '2026-08-28-worker-admins';
+
 // Short server-side cache for the external schedule grid. Reading another Google Sheet
 // through Apps Script is slow, so cache the raw matrix briefly; background polls reuse
 // it, while an explicit admin refresh (params.refresh) or a source change bypasses it.
@@ -4496,6 +4501,9 @@ function doGet() {
 
       status:
         'ok',
+
+      version:
+        BACKEND_VERSION,
 
       timezone:
         TIMEZONE
