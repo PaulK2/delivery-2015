@@ -3613,6 +3613,23 @@ function nextMondayISO() {
 }
 
 
+// Diagnostic — Run this in the editor to see each active user's role and whether the
+// backend will let them submit availability. Confirms the worker-admin name match
+// (ПАВЕЛ, В. ПЕТКОВ) against the ACTUAL stored names.
+function logAvailabilityPermissions() {
+  readObjects(TABS.EMPLOYEES).forEach(function(e) {
+    if (!normalizeBoolean(e.active)) return;
+    Logger.log(
+      (canSubmitAvailability(e) ? 'CAN submit  ' : 'CANNOT      ') +
+      ' role=' + (e.role || 'employee') +
+      '  name="' + e.name + '"  key="' + nameKeyBG(e.name) + '"'
+    );
+  });
+  Logger.log('worker-admins expected keys: ' +
+    AVAILABILITY_WORKER_ADMINS.map(function(n) { return nameKeyBG(n); }).join(', '));
+}
+
+
 /* ============================================================================
  * MIGRATION — run once on the already-deployed Fleet App Data sheet
  * ========================================================================== */

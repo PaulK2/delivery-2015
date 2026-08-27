@@ -14,3 +14,7 @@
 
 /
   Cache-Control: public, max-age=0, must-revalidate
+
+# The service worker must never be served stale, or a new one is never picked up.
+/sw.js
+  Cache-Control: public, max-age=0, must-revalidate
