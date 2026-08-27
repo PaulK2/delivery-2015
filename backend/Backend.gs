@@ -46,6 +46,9 @@ var SCHEDULE_CACHE_PREFIX = 'schedule_raw:';
 // MUST_EXIST ones if missing.
 var ADMIN_USER_NAMES = ['ЦЕЦО', 'СИМО', 'ПАВЕЛ', 'В. ПЕТКОВ'];
 var ADMIN_MUST_EXIST = ['ЦЕЦО', 'СИМО'];
+// Admins who ALSO work shifts and may therefore submit their own availability. Other
+// admins (ЦЕЦО, СИМО) only review the team and cannot submit.
+var AVAILABILITY_WORKER_ADMINS = ['ПАВЕЛ', 'В. ПЕТКОВ'];
 // The generic shared account to retire once real admins are in place.
 var LEGACY_ADMIN_NAME = 'Администратор';
 
@@ -640,12 +643,28 @@ function findEmployee(employeeId) {
 }
 
 
+// Whether a user may submit their own shift availability. Regular staff always can;
+// admins can only if they're on the worker-admin list (they also work shifts).
+function canSubmitAvailability(user) {
+  if (!user) return false;
+  if (String(user.role) !== 'admin') return true;
+  for (var i = 0; i < AVAILABILITY_WORKER_ADMINS.length; i++) {
+    if (nameKeyBG(user.name) === nameKeyBG(AVAILABILITY_WORKER_ADMINS[i])) {
+      return true;
+    }
+  }
+  return false;
+}
+
+
 function publicUser(employee) {
 
   return {
     employee_id: employee.employee_id,
     name: employee.name,
-    role: employee.role || 'employee'
+    role: employee.role || 'employee',
+    // Lets the frontend show the "my availability" editor to worker-admins too.
+    can_submit_availability: canSubmitAvailability(employee)
   };
 }
 
@@ -3272,9 +3291,9 @@ function saveAvailability(params, ctx) {
   }
 
 
-  // Administrators review the team's requests but never submit their own shifts.
-  // Enforced on the backend, not just hidden in the UI.
-  if (String(ctx.user.role) === 'admin') {
+  // Pure admins review the team's requests but never submit their own shifts; admins
+  // who also work shifts (worker-admins) may submit. Enforced here, not just in the UI.
+  if (!canSubmitAvailability(ctx.user)) {
     return fail('admin_no_availability');
   }
 

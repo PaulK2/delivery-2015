@@ -115,10 +115,14 @@ export default function AvailabilityPage() {
 
   const open = status.open
 
-  // Regular users can request/edit shifts only until 00:00 Saturday. On Saturday and
-  // Sunday their requests are locked. Admins are not subject to this weekend lock.
+  // Who may submit their own shifts: regular staff, plus worker-admins (ПАВЕЛ,
+  // В. ПЕТКОВ) who also work. Pure admins (ЦЕЦО, СИМО) only review. The backend flag
+  // is authoritative; fall back to role when it isn't present (older backend).
+  const canSubmit = user?.can_submit_availability ?? !isAdmin
+
+  // Submitters can request/edit shifts only until 00:00 Saturday; on Sat/Sun it's locked.
   const weekday = weekdayIndex(todayISO()) // 0=Sun … 6=Sat
-  const weekendLocked = !isAdmin && (weekday === 6 || weekday === 0)
+  const weekendLocked = canSubmit && (weekday === 6 || weekday === 0)
   const canEdit = open && !weekendLocked
 
   const weekLabel =
@@ -129,8 +133,8 @@ export default function AvailabilityPage() {
       <h1 className="page__title">Следваща седмица</h1>
       <p className="page__subtitle">Наличност за седмица {weekLabel}</p>
 
-      <div className={'banner ' + (isAdmin ? 'banner--info' : canEdit ? 'banner--ok' : 'banner--warn')}>
-        {isAdmin
+      <div className={'banner ' + (!canSubmit ? 'banner--info' : canEdit ? 'banner--ok' : 'banner--warn')}>
+        {!canSubmit
           ? 'Преглед на заявките на екипа. Администраторите не подават собствени заявки за смени.'
           : weekendLocked
             ? 'Заявките за смени вече не могат да се редактират — приемът е заключен за събота и неделя.'
@@ -139,9 +143,9 @@ export default function AvailabilityPage() {
               : 'Приемът на наличност е затворен. Можете само да преглеждате.'}
       </div>
 
-      {/* My availability editor — regular users only. Admins review the team but never
-          submit their own shifts (also enforced by the backend). */}
-      {!isAdmin ? (
+      {/* My availability editor — for anyone who may submit (regular staff + worker-admins).
+          Pure admins only review the team (also enforced by the backend). */}
+      {canSubmit ? (
         <section className="detail-section">
           <h2 className="detail-section__title">Моята наличност</h2>
           <div className="day-list">
