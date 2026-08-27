@@ -85,21 +85,33 @@ export default function SchedulePage() {
     })
   }, [data, filters])
 
-  // Group by weekday, Monday-first (spec §15 — "by day" view).
+  // Group by weekday (Monday-first), then by restaurant, then full-shift before evening
+  // within each restaurant (spec §15 — "by day" view). Shape: [ [wd, [ [locName, entries] ] ] ].
   const byWeekday = useMemo(() => {
-    const map = new Map()
+    const days = new Map()
     for (const e of filtered) {
-      if (!map.has(e.weekday)) map.set(e.weekday, [])
-      map.get(e.weekday).push(e)
+      if (!days.has(e.weekday)) days.set(e.weekday, new Map())
+      const locs = days.get(e.weekday)
+      if (!locs.has(e.location_name)) locs.set(e.location_name, [])
+      locs.get(e.location_name).push(e)
     }
-    for (const list of map.values()) {
-      list.sort(
-        (a, b) =>
-          shiftSortRank(a.shift_type) - shiftSortRank(b.shift_type) ||
-          a.location_name.localeCompare(b.location_name, 'bg')
-      )
+    const result = []
+    for (const wd of WEEK_ORDER) {
+      if (!days.has(wd)) continue
+      const locs = days.get(wd)
+      const locList = [...locs.keys()]
+        .sort((a, b) => a.localeCompare(b, 'bg'))
+        .map((locName) => {
+          const list = locs.get(locName).sort(
+            (a, b) =>
+              shiftSortRank(a.shift_type) - shiftSortRank(b.shift_type) ||
+              a.employee_name.localeCompare(b.employee_name, 'bg')
+          )
+          return [locName, list]
+        })
+      result.push([wd, locList])
     }
-    return WEEK_ORDER.filter((wd) => map.has(wd)).map((wd) => [wd, map.get(wd)])
+    return result
   }, [filtered])
 
   return (
@@ -166,28 +178,39 @@ export default function SchedulePage() {
         <div className="empty-state">Няма записи в графика за избраните филтри.</div>
       ) : (
         <div className="schedule-days">
-          {byWeekday.map(([wd, entries]) => (
+          {byWeekday.map(([wd, locs]) => (
             <section key={wd} className="schedule-day">
               <h2 className="schedule-day__head">
                 <span className="schedule-day__weekday">{weekdayNameByIndex(wd)}</span>
-                <span className="schedule-day__count">{entries.length}</span>
+                <span className="schedule-day__count">
+                  {locs.reduce((n, [, list]) => n + list.length, 0)}
+                </span>
               </h2>
-              <ul className="schedule-list">
-                {entries.map((e) => (
-                  <li
-                    key={e.schedule_id}
-                    className={'schedule-item schedule-item--' + e.shift_type}
-                  >
-                    <span className="schedule-item__person">{e.employee_name}</span>
-                    <span className="schedule-item__location">{e.location_name}</span>
-                    <ScheduleCar rawCar={e.car} known={knownCars} />
-                    {formatPayment(e.payment) ? (
-                      <span className="schedule-item__pay">{formatPayment(e.payment)}</span>
-                    ) : null}
-                    <span className="schedule-item__hours">{shiftHours(e.shift_type)}</span>
-                  </li>
-                ))}
-              </ul>
+
+              {locs.map(([locName, entries]) => (
+                <div key={locName} className="schedule-loc">
+                  <h3 className="schedule-loc__head">
+                    <span className="schedule-loc__name">{locName}</span>
+                    <span className="schedule-loc__count">{entries.length}</span>
+                  </h3>
+                  <ul className="schedule-list">
+                    {entries.map((e) => (
+                      <li
+                        key={e.schedule_id}
+                        className={'schedule-item schedule-item--' + e.shift_type}
+                      >
+                        <span className="schedule-item__person">{e.employee_name}</span>
+                        <span className="schedule-item__shift">{SHIFT_LABELS[e.shift_type]}</span>
+                        <ScheduleCar rawCar={e.car} known={knownCars} />
+                        {formatPayment(e.payment) ? (
+                          <span className="schedule-item__pay">{formatPayment(e.payment)}</span>
+                        ) : null}
+                        <span className="schedule-item__hours">{shiftHours(e.shift_type)}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
             </section>
           ))}
         </div>

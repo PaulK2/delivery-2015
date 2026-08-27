@@ -1,7 +1,7 @@
 import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
 import { useOutletContext } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext.jsx'
-import { todayISO, weekdayIndex, shiftISO, weekdayBG, formatDateBG } from '../utils/datetime.js'
+import { todayISO, shiftISO, weekdayBG, formatDateBG, scheduleEntriesForDate } from '../utils/datetime.js'
 import LocationDetailPanel from '../components/LocationDetailPanel.jsx'
 import Icon from '../components/Icon.jsx'
 import Spinner from '../components/Spinner.jsx'
@@ -15,12 +15,11 @@ const norm = (s) => (s || '').toString().trim().toLowerCase()
 const nameKey = (s) => String(s || '').toLowerCase().replace(/\s+/g, '')
 
 export default function HomePage() {
-  // Schedule + locations (and today's shift) come from Layout via Outlet context.
-  const { locations, schedule, loading, error, reload, todayShift } = useOutletContext()
+  // Schedule + locations come from Layout via Outlet context.
+  const { locations, schedule, loading, error, reload } = useOutletContext()
   const { user } = useAuth()
   const [date, setDate] = useState(todayISO())
   const [selectedId, setSelectedId] = useState(null)
-  const [autoFocused, setAutoFocused] = useState(false)
 
   const isToday = date === todayISO()
 
@@ -30,11 +29,11 @@ export default function HomePage() {
     return m
   }, [locations])
 
-  // Schedule entries are keyed by weekday; match the selected date's weekday.
-  const wd = weekdayIndex(date)
+  // Match the selected calendar date exactly (day-of-month + weekday), so a week the
+  // sheet doesn't cover shows an empty schedule instead of repeating this week's.
   const entriesForDate = useMemo(
-    () => schedule.entries.filter((e) => e.weekday === wd),
-    [schedule, wd]
+    () => scheduleEntriesForDate(schedule.entries, date),
+    [schedule, date]
   )
 
   const entriesByLocation = useMemo(() => {
@@ -77,13 +76,14 @@ export default function HomePage() {
       ? [Number(myShiftLocation.latitude), Number(myShiftLocation.longitude)]
       : null
 
-  // On first load, also select today's restaurant so the side panel opens on it.
+  // As the user cycles through days, follow their restaurant for that day: select it so
+  // the panel below the map shows that day's schedule for it (not only the map zoom).
+  // A manual marker click still overrides within the same day (this only re-runs when
+  // the date or the day's shift location changes). Days with no shift clear the panel.
+  const myShiftLocationId = myShiftLocation?.location_id || null
   useEffect(() => {
-    if (!autoFocused && todayShift?.location) {
-      setSelectedId(todayShift.location.location_id)
-      setAutoFocused(true)
-    }
-  }, [autoFocused, todayShift])
+    setSelectedId(myShiftLocationId)
+  }, [date, myShiftLocationId])
 
   if (loading) {
     return (

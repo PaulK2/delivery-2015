@@ -965,6 +965,32 @@ button {
   justify-content: center;
   padding: 0 6px;
 }
+/* Restaurant group within a day (people grouped by location, full shift first). */
+.schedule-loc {
+  border-top: 1px solid var(--border-subtle);
+}
+.schedule-loc:first-of-type {
+  border-top: none;
+}
+.schedule-loc__head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  padding: 10px 14px 2px;
+  font-size: 13px;
+}
+.schedule-loc__name {
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--text-2);
+}
+.schedule-loc__count {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+}
 .schedule-list {
   list-style: none;
   margin: 0;
@@ -972,6 +998,12 @@ button {
   display: flex;
   flex-direction: column;
   gap: 6px;
+}
+.schedule-item__shift {
+  color: var(--text-2);
+  font-size: 13px;
+  flex: 1;
+  min-width: 90px;
 }
 .schedule-item {
   display: flex;

@@ -58,6 +58,23 @@ export function weekdayNameByIndex(idx) {
   return WEEKDAYS_BG[idx] || ''
 }
 
+// Day-of-month (1–31) for an ISO date — matches the schedule grid's day numbers.
+export function dayOfMonth(iso) {
+  if (!iso) return null
+  return new Date(`${iso}T12:00:00`).getDate()
+}
+
+// The management schedule grid tags each entry with its day-of-month AND weekday, so an
+// entry belongs to a calendar date only when BOTH match. Matching this way (instead of
+// by weekday alone) means viewing a week the sheet doesn't cover yields no entries —
+// the schedule shows empty for unconfigured future weeks rather than repeating this week.
+export function scheduleEntriesForDate(entries, iso) {
+  if (!iso || !Array.isArray(entries)) return []
+  const dom = dayOfMonth(iso)
+  const wd = weekdayIndex(iso)
+  return entries.filter((e) => Number(e.day_number) === dom && e.weekday === wd)
+}
+
 // Monday-first ordering of getDay() indices, for weekly views.
 export const WEEK_ORDER = [1, 2, 3, 4, 5, 6, 0]
 
