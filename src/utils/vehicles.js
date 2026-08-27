@@ -38,6 +38,7 @@ export const FLEET_CATALOG = {
   CB2804TA: { make: 'Citroen', model: 'C1' },
   CB9206AP: { make: 'Opel', model: 'Astra' },
   CB3259KC: { make: 'Seat', model: 'Ibiza' },
+  CA0284PC: { make: 'Honda', model: 'HR-V' },
   // Clone of CB0254CO (Citroen C1) — same vehicle, reused photo.
   CB6300KM: { make: 'Citroen', model: 'C1' },
 }
