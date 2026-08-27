@@ -96,11 +96,22 @@ export function normalizePlate(value) {
 // so photo and label always agree. Cars without a photo fall back to the placeholder.
 export const CAR_PHOTO_PLATES = new Set(Object.keys(FLEET_CATALOG))
 
-// Resolve a car's photo: explicit image URL wins, else a bundled photo by plate.
+// Resolve a car's full-size photo: explicit image URL wins, else a bundled photo by
+// plate. Use this on the vehicle detail page.
 export function carPhoto(car) {
   if (car?.image) return car.image
   const plate = normalizePlate(car?.registration)
   return CAR_PHOTO_PLATES.has(plate) ? `${import.meta.env.BASE_URL}cars/${plate}.png` : null
+}
+
+// Lightweight ~420px WebP thumbnail for list cards (≈10KB vs the multi-MB PNG). Falls
+// back to the explicit image URL when one is set. Full photos load only on the detail page.
+export function carThumb(car) {
+  if (car?.image) return car.image
+  const plate = normalizePlate(car?.registration)
+  return CAR_PHOTO_PLATES.has(plate)
+    ? `${import.meta.env.BASE_URL}cars/thumbs/${plate}.webp`
+    : null
 }
 
 // Bulgarian plates only use the twelve letters shared by the Cyrillic and Latin

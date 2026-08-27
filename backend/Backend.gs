@@ -35,6 +35,12 @@
 var TIMEZONE = 'Europe/Sofia';
 var SESSION_TTL_DAYS = 30;
 
+// Short server-side cache for the external schedule grid. Reading another Google Sheet
+// through Apps Script is slow, so cache the raw matrix briefly; background polls reuse
+// it, while an explicit admin refresh (params.refresh) or a source change bypasses it.
+var SCHEDULE_CACHE_TTL_SEC = 45;
+var SCHEDULE_CACHE_PREFIX = 'schedule_raw:';
+
 // Administration belongs to these real named users — there is no shared admin account.
 // migrateAdminsAndAuth() promotes any that exist to the 'admin' role and creates the
 // MUST_EXIST ones if missing.
@@ -1551,6 +1557,8 @@ function setScheduleSource(params, ctx) {
     );
   }
 
+  clearScheduleCache(); // source changed — don't serve the previous grid
+
   audit(
     ctx.user,
     'schedule_source_changed',
@@ -1594,6 +1602,22 @@ function getScheduleRaw(params, ctx) {
     });
   }
 
+  var cache = CacheService.getScriptCache();
+  var cacheKey = SCHEDULE_CACHE_PREFIX + url;
+  var forceRefresh = params && params.refresh === true;
+
+  // Serve a recent cached copy unless the caller explicitly asked to refresh.
+  if (!forceRefresh) {
+    var cached = cache.get(cacheKey);
+    if (cached) {
+      try {
+        return JSON.parse(cached);
+      } catch (e) {
+        /* corrupt cache entry — fall through and re-read */
+      }
+    }
+  }
+
   try {
 
     var sheet =
@@ -1618,7 +1642,7 @@ function getScheduleRaw(params, ctx) {
         .getDataRange()
         .getDisplayValues();
 
-    return ok({
+    var result = ok({
 
       configured: true,
 
@@ -1643,6 +1667,18 @@ function getScheduleRaw(params, ctx) {
         matrix
     });
 
+    // Cache the serialized result (CacheService caps values at 100KB — skip if larger).
+    try {
+      var serialized = JSON.stringify(result);
+      if (serialized.length < 95000) {
+        cache.put(cacheKey, serialized, SCHEDULE_CACHE_TTL_SEC);
+      }
+    } catch (e) {
+      /* caching is best-effort; never fail the request over it */
+    }
+
+    return result;
+
   } catch (e) {
 
     console.error(e);
@@ -1650,6 +1686,17 @@ function getScheduleRaw(params, ctx) {
     return fail(
       'schedule_load_failed'
     );
+  }
+}
+
+
+// Drop the cached schedule grid (called when the source sheet changes).
+function clearScheduleCache() {
+  try {
+    var url = getSetting('current_schedule_sheet_url');
+    if (url) CacheService.getScriptCache().remove(SCHEDULE_CACHE_PREFIX + url);
+  } catch (e) {
+    /* best-effort */
   }
 }
 
@@ -3353,6 +3400,10 @@ function saveAvailability(params, ctx) {
     nowStamp();
 
 
+  // Build all new rows and write them in ONE batch (setValues) instead of an
+  // appendRow per shift — far fewer Sheets round-trips for a weekly submission.
+  var newRows = [];
+
   entries.forEach(
     function(entry) {
 
@@ -3362,25 +3413,28 @@ function saveAvailability(params, ctx) {
         return;
       }
 
-
-      sheet.appendRow([
-
+      newRows.push([
         genId('AVL'),
-
         ctx.user.employee_id,
-
         ctx.user.name,
-
         weekStart,
-
         entry.date,
-
         entry.shiftType,
-
         updatedAt
       ]);
     }
   );
+
+  if (newRows.length) {
+    sheet
+      .getRange(
+        sheet.getLastRow() + 1,
+        1,
+        newRows.length,
+        newRows[0].length
+      )
+      .setValues(newRows);
+  }
 
 
   audit(

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { getCars } from '../services/fleet/fleet.js'
+import { useAutoRefresh } from '../hooks/useAutoRefresh.js'
 import { CONFIG } from '../config/index.js'
 import { carTitle } from '../utils/vehicles.js'
 import VehicleCard from '../components/VehicleCard.jsx'
@@ -14,12 +15,12 @@ export default function VehiclesPage() {
   const [q, setQ] = useState('')
   const inFlight = useRef(false)
 
-  async function load(showSpinner = true) {
+  async function load({ showSpinner = false, force = false } = {}) {
     if (inFlight.current) return // don't overlap with an in-progress refresh
     inFlight.current = true
     if (showSpinner) setLoading(true)
     try {
-      setCars(await getCars())
+      setCars(await getCars({ force }))
       setError('')
     } catch (e) {
       setError(e.message || 'Автомобилите не могат да бъдат заредени.')
@@ -29,16 +30,14 @@ export default function VehiclesPage() {
     }
   }
 
+  // Initial load reuses any warm cache (instant on repeat visits); show the spinner
+  // only when there's nothing cached yet.
   useEffect(() => {
-    load(true)
-    const id = setInterval(() => load(false), CONFIG.autoRefreshMs)
-    const onFocus = () => load(false)
-    window.addEventListener('focus', onFocus)
-    return () => {
-      clearInterval(id)
-      window.removeEventListener('focus', onFocus)
-    }
+    load({ showSpinner: cars.length === 0 })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  useAutoRefresh(() => load({ force: true }), CONFIG.autoRefreshMs)
 
   // Search works on partial registration plate (spec §75) and make/model.
   const filtered = useMemo(() => {
@@ -59,7 +58,7 @@ export default function VehiclesPage() {
     <div className="page">
       <div className="page__header">
         <h1 className="page__title">Автомобили</h1>
-        <button className="btn btn--ghost btn--sm" onClick={() => load(true)}>
+        <button className="btn btn--ghost btn--sm" onClick={() => load({ showSpinner: true, force: true })}>
           ↻ Обнови
         </button>
       </div>
@@ -88,7 +87,7 @@ export default function VehiclesPage() {
       ) : error ? (
         <div className="banner banner--error" role="alert">
           {error}
-          <button className="btn btn--sm btn--ghost" onClick={() => load(true)}>
+          <button className="btn btn--sm btn--ghost" onClick={() => load({ showSpinner: true, force: true })}>
             Опитай отново
           </button>
         </div>

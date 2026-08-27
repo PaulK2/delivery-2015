@@ -1,5 +1,6 @@
 // Availability service (spec §17–§23).
 import { api, ApiError } from '../api/client.js'
+import { cachedRequest, invalidatePrefix } from '../api/cache.js'
 import { todayISO, weekdayIndex, shiftISO, toIsoDate } from '../../utils/datetime.js'
 
 // Monday of next week, computed client-side (fallback + default).
@@ -33,31 +34,44 @@ export async function getAvailabilityStatus() {
   }
 }
 
-// All availability rows for a week (team overview). We fetch everything and filter
-// client-side after normalizing dates — robust to Sheets' date coercion and to
-// backends that haven't been redeployed with the normalized filter yet.
-export async function getAvailability(weekStart) {
-  const data = await api('getAvailability', {})
-  const rows = (data?.availability || []).map((r) => ({
-    ...r,
-    date: toIsoDate(r.date),
-    week_start: toIsoDate(r.week_start),
-  }))
+// All availability rows for a week (team overview). We fetch everything (cached ~30s)
+// and filter client-side after normalizing dates — robust to Sheets' date coercion and
+// to backends that haven't been redeployed with the normalized filter yet.
+export async function getAvailability(weekStart, { force } = {}) {
+  const rows = await cachedRequest(
+    'availability:all',
+    30 * 1000,
+    async () => {
+      const data = await api('getAvailability', {})
+      return (data?.availability || []).map((r) => ({
+        ...r,
+        date: toIsoDate(r.date),
+        week_start: toIsoDate(r.week_start),
+      }))
+    },
+    { force }
+  )
   return weekStart ? rows.filter((r) => r.week_start === weekStart) : rows
 }
 
 // Save the current user's availability for the week.
 // entries: [{ date, shiftType }] — 'none' entries are dropped server-side.
 export async function saveAvailability(weekStart, entries) {
-  return api('saveAvailability', { weekStart, entries })
+  const res = await api('saveAvailability', { weekStart, entries })
+  invalidatePrefix('availability')
+  return res
 }
 
 // Admin: open/close the submission period.
 export async function setAvailabilityOpen(open) {
-  return api('setAvailabilityOpen', { open })
+  const res = await api('setAvailabilityOpen', { open })
+  invalidatePrefix('availability')
+  return res
 }
 
 // Admin: set the active week (falls back to a no-op if not deployed).
 export async function setAvailabilityWeek(weekStart) {
-  return api('setAvailabilityWeek', { weekStart })
+  const res = await api('setAvailabilityWeek', { weekStart })
+  invalidatePrefix('availability')
+  return res
 }

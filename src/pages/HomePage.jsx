@@ -1,11 +1,14 @@
-import { useEffect, useMemo, useState } from 'react'
+import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
 import { useOutletContext } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext.jsx'
 import { todayISO, weekdayIndex, shiftISO, weekdayBG, formatDateBG } from '../utils/datetime.js'
-import SofiaMap from '../components/SofiaMap.jsx'
 import LocationDetailPanel from '../components/LocationDetailPanel.jsx'
 import Icon from '../components/Icon.jsx'
 import Spinner from '../components/Spinner.jsx'
+
+// The map (Leaflet, ~150KB) is split out so the Home page frame — date nav, side panel,
+// today's shift — paints immediately and the map streams in after.
+const SofiaMap = lazy(() => import('../components/SofiaMap.jsx'))
 
 const norm = (s) => (s || '').toString().trim().toLowerCase()
 // Case- and space-insensitive name key (so "Иван  Петров" == "иванпетров").
@@ -136,13 +139,15 @@ export default function HomePage() {
             <Icon name="chevron-right" size={20} />
           </button>
 
-          <SofiaMap
-            locations={locations}
-            countsByLocation={countsByLocation}
-            selectedId={selectedId}
-            onSelect={setSelectedId}
-            focus={focus}
-          />
+          <Suspense fallback={<div className="map-skeleton" aria-hidden="true" />}>
+            <SofiaMap
+              locations={locations}
+              countsByLocation={countsByLocation}
+              selectedId={selectedId}
+              onSelect={setSelectedId}
+              focus={focus}
+            />
+          </Suspense>
         </div>
 
         <div className="home__side">

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { getMaintenance, resolveIssue } from '../services/maintenance/maintenance.js'
+import { useAutoRefresh } from '../hooks/useAutoRefresh.js'
 import { useAuth } from '../context/AuthContext.jsx'
 import { useToast } from '../context/ToastContext.jsx'
 import {
@@ -28,12 +29,12 @@ export default function MaintenancePage() {
   const [filters, setFilters] = useState({ status: 'open', severity: '', category: '', vehicle: '' })
   const inFlight = useRef(false)
 
-  async function load(showSpinner = true) {
+  async function load({ showSpinner = false, force = false } = {}) {
     if (inFlight.current) return // don't overlap with an in-progress refresh
     inFlight.current = true
     if (showSpinner) setLoading(true)
     try {
-      setItems(await getMaintenance({}))
+      setItems(await getMaintenance({}, { force }))
       setError('')
     } catch (e) {
       setError(e.message || 'Сигналите не могат да бъдат заредени.')
@@ -44,15 +45,11 @@ export default function MaintenancePage() {
   }
 
   useEffect(() => {
-    load(true)
-    const id = setInterval(() => load(false), CONFIG.autoRefreshMs)
-    const onFocus = () => load(false)
-    window.addEventListener('focus', onFocus)
-    return () => {
-      clearInterval(id)
-      window.removeEventListener('focus', onFocus)
-    }
+    load({ showSpinner: items.length === 0 })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  useAutoRefresh(() => load({ force: true }), CONFIG.autoRefreshMs)
 
   const filtered = useMemo(() => {
     const v = filters.vehicle.replace(/\s+/g, '').toLowerCase()
@@ -80,7 +77,7 @@ export default function MaintenancePage() {
       await resolveIssue(payload)
       setResolving(null)
       showToast('Проблемът е отстранен.', 'success')
-      await load(false)
+      await load({ force: true })
     } catch (e) {
       showToast(e.message || 'Възникна проблем.', 'error')
     } finally {
@@ -92,7 +89,7 @@ export default function MaintenancePage() {
     <div className="page">
       <div className="page__header">
         <h1 className="page__title">Сигнали и поддръжка</h1>
-        <button className="btn btn--ghost btn--sm" onClick={() => load(true)}>
+        <button className="btn btn--ghost btn--sm" onClick={() => load({ showSpinner: true, force: true })}>
           ↻ Обнови
         </button>
       </div>
@@ -156,7 +153,7 @@ export default function MaintenancePage() {
       ) : error ? (
         <div className="banner banner--error" role="alert">
           {error}
-          <button className="btn btn--sm btn--ghost" onClick={() => load(true)}>
+          <button className="btn btn--sm btn--ghost" onClick={() => load({ showSpinner: true, force: true })}>
             Опитай отново
           </button>
         </div>

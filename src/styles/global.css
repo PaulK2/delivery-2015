@@ -251,6 +251,13 @@ button {
   justify-content: center;
   height: 100vh;
 }
+/* In-content loader for lazily-loaded page chunks — keeps the shell visible. */
+.page-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 48px 16px;
+}
 
 /* ---------- App shell ---------- */
 .app-shell {
@@ -687,6 +694,28 @@ button {
 .sofia-map {
   height: 100%;
   width: 100%;
+}
+/* Placeholder shown while the map chunk loads — keeps layout stable, no shift. */
+.map-skeleton {
+  height: 100%;
+  width: 100%;
+  border-radius: var(--radius);
+  background: linear-gradient(100deg, var(--surface-2) 30%, var(--surface) 50%, var(--surface-2) 70%);
+  background-size: 200% 100%;
+  animation: map-skeleton-shimmer 1.2s ease-in-out infinite;
+}
+@keyframes map-skeleton-shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .map-skeleton {
+    animation: none;
+  }
 }
 
 /* Mobile-only hint: tap to enable map panning (dragging is off by default on phones

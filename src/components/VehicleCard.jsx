@@ -1,19 +1,26 @@
 import { Link } from 'react-router-dom'
 import StatusBadge from './StatusBadge.jsx'
-import { carTitle, carPhoto, isOwnCar, oilInfo } from '../utils/vehicles.js'
+import { carTitle, carThumb, isOwnCar, oilInfo } from '../utils/vehicles.js'
 
 // Vehicle card for the fleet list (spec §24, §26). The registration plate is the
 // most prominent element (spec §28).
 export default function VehicleCard({ car }) {
   const maintenance = car.status === 'maintenance'
   const own = isOwnCar(car)
-  const photo = carPhoto(car)
+  const photo = carThumb(car) // small thumbnail; full photo loads on the detail page
   const oilDue = !own && oilInfo(car).due
   return (
     <Link to={`/vehicles/${car.car_id}`} className="vehicle-card">
       <div className="vehicle-card__media">
         {photo ? (
-          <img src={photo} alt={carTitle(car)} loading="lazy" />
+          <img
+            src={photo}
+            alt={carTitle(car)}
+            loading="lazy"
+            decoding="async"
+            width="420"
+            height="280"
+          />
         ) : (
           <span className="vehicle-card__noimg" aria-hidden="true">{own ? '🔑' : '🚗'}</span>
         )}

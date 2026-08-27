@@ -3,6 +3,7 @@ import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext.jsx'
 import { CONFIG } from '../config/index.js'
 import { getLocations, getSchedule } from '../services/schedule/schedule.js'
+import { useAutoRefresh } from '../hooks/useAutoRefresh.js'
 import { todayISO, weekdayIndex, weekdayBG, formatDateBG } from '../utils/datetime.js'
 import { NAV_ITEMS } from './nav.js'
 import OfflineBanner from './OfflineBanner.jsx'
@@ -34,12 +35,17 @@ export default function Layout() {
   // a new background trigger is skipped instead of firing a duplicate request.
   const inFlight = useRef(false)
 
-  const reload = useCallback(async (showSpinner = false) => {
+  // `force` bypasses the client cache (background revalidation); the initial load reuses
+  // any warm cache so returning to Home feels instant.
+  const reload = useCallback(async (showSpinner = false, force = false) => {
     if (inFlight.current) return
     inFlight.current = true
     if (showSpinner) setLoading(true)
     try {
-      const [locRes, schRes] = await Promise.allSettled([getLocations(), getSchedule()])
+      const [locRes, schRes] = await Promise.allSettled([
+        getLocations({ force }),
+        getSchedule({ force }),
+      ])
       if (locRes.status === 'fulfilled') setLocations(locRes.value)
       if (schRes.status === 'fulfilled') {
         setSchedule(schRes.value)
@@ -54,15 +60,10 @@ export default function Layout() {
   }, [])
 
   useEffect(() => {
-    reload(true)
-    const id = setInterval(() => reload(false), CONFIG.autoRefreshMs)
-    const onFocus = () => reload(false)
-    window.addEventListener('focus', onFocus)
-    return () => {
-      clearInterval(id)
-      window.removeEventListener('focus', onFocus)
-    }
+    reload(true, false)
   }, [reload])
+
+  useAutoRefresh(() => reload(false, true), CONFIG.autoRefreshMs)
 
   const todayIso = todayISO()
   const todayWd = weekdayIndex(todayIso)

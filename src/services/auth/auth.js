@@ -1,6 +1,7 @@
 // Authentication service. Wraps the backend auth actions (spec §53, §54, §60).
 // The PIN is never stored on the device — only an opaque session token (spec §54).
 import { api, setToken, getToken } from '../api/client.js'
+import { invalidateAll } from '../api/cache.js'
 
 const USER_KEY = 'fv_user'
 
@@ -47,6 +48,7 @@ export async function logout() {
     /* even if the server call fails, drop the local session */
   }
   clearSession()
+  invalidateAll() // never let the next user see this session's cached data
 }
 
 // Returns the current user if the stored token is still valid, else null.

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet'
 import L from 'leaflet'
 import { CONFIG } from '../config/index.js'
@@ -67,6 +67,16 @@ export default function SofiaMap({ locations, countsByLocation, selectedId, onSe
   const isMobile = useIsMobile()
   const [dragActive, setDragActive] = useState(false)
 
+  // Only active, geocoded locations get a marker. Memoized so markers aren't recomputed
+  // on every parent re-render (e.g. auto-refresh) unless the location set actually changes.
+  const markerLocations = useMemo(
+    () =>
+      (locations || []).filter(
+        (loc) => loc.active !== false && loc.latitude != null && loc.longitude != null
+      ),
+    [locations]
+  )
+
   return (
     <div className="sofia-map-wrap">
       <MapContainer
@@ -85,8 +95,7 @@ export default function SofiaMap({ locations, countsByLocation, selectedId, onSe
           defaultCenter={center}
           defaultZoom={CONFIG.map.defaultZoom}
         />
-        {locations.map((loc) => {
-        if (loc.latitude == null || loc.longitude == null) return null
+        {markerLocations.map((loc) => {
         const count = countsByLocation[loc.location_id] || 0
         return (
           <Marker

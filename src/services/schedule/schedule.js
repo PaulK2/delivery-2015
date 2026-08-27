@@ -1,35 +1,50 @@
 // Schedule service. Reads the raw schedule matrix from the backend and normalizes
 // it through the isolated parser (spec §11–§16, §100).
 import { api } from '../api/client.js'
+import { cachedRequest, invalidate } from '../api/cache.js'
 import { parseScheduleMatrix } from './parser.js'
 
+// One shared locations implementation — the map, schedule page and admin all reuse the
+// same cached fetch (re-exported so existing imports from this module keep working).
+export { getLocations } from '../locations/locations.js'
+
+const SCHEDULE_TTL = 45 * 1000 // short cache; fetched + normalized once and reused
+
 // Returns { entries, locationNames, configured, sheetName }.
-// The backend getScheduleRaw returns the full 2D grid (display values); parsing
-// happens here, client-side and isolated, so the sheet format can change without
-// touching UI code.
-export async function getSchedule() {
-  const data = await api('getScheduleRaw', {})
-  if (!data || data.configured === false) {
-    return { entries: [], locationNames: [], configured: false, sheetName: '' }
-  }
-  const { entries, locationNames } = parseScheduleMatrix(data.matrix || [])
-  return { entries, locationNames, configured: true, sheetName: data.sheet_name || '' }
+// The backend getScheduleRaw returns the full 2D grid (display values); parsing happens
+// here, client-side and isolated, so the sheet format can change without touching UI.
+// Cached (and normalized) once so the Home map and Schedule page don't each re-download
+// and re-parse the same weekly grid within a session.
+export async function getSchedule({ force, serverRefresh } = {}) {
+  return cachedRequest(
+    'schedule',
+    SCHEDULE_TTL,
+    async () => {
+      // Background polls (force) reuse the backend's short server cache; only an explicit
+      // admin refresh (serverRefresh) tells the backend to re-read the external sheet.
+      const data = await api('getScheduleRaw', serverRefresh ? { refresh: true } : {})
+      if (!data || data.configured === false) {
+        return { entries: [], locationNames: [], configured: false, sheetName: '' }
+      }
+      const { entries, locationNames } = parseScheduleMatrix(data.matrix || [])
+      return { entries, locationNames, configured: true, sheetName: data.sheet_name || '' }
+    },
+    { force: force || serverRefresh }
+  )
 }
 
-// Same read; the UI's explicit "refresh" button uses this name.
-export const refreshSchedule = getSchedule
+// The UI's explicit "refresh" button bypasses both the client and backend caches.
+export function refreshSchedule() {
+  return getSchedule({ serverRefresh: true })
+}
 
 // Admin: configure the schedule source Google Sheet (spec §12).
 export async function setScheduleSource(url, tabName) {
-  return api('setScheduleSource', { url, tabName })
+  const res = await api('setScheduleSource', { url, tabName })
+  invalidate('schedule')
+  return res
 }
 
 export async function getScheduleSource() {
   return api('getScheduleSource', {})
-}
-
-// Work locations with coordinates for the map (spec §56).
-export async function getLocations() {
-  const data = await api('getLocations', {})
-  return data?.locations || []
 }
