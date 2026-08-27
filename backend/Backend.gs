@@ -35,6 +35,14 @@
 var TIMEZONE = 'Europe/Sofia';
 var SESSION_TTL_DAYS = 30;
 
+// Administration belongs to these real named users — there is no shared admin account.
+// migrateAdminsAndAuth() promotes any that exist to the 'admin' role and creates the
+// MUST_EXIST ones if missing.
+var ADMIN_USER_NAMES = ['ЦЕЦО', 'СИМО', 'ПАВЕЛ', 'В. ПЕТКОВ'];
+var ADMIN_MUST_EXIST = ['ЦЕЦО', 'СИМО'];
+// The generic shared account to retire once real admins are in place.
+var LEGACY_ADMIN_NAME = 'Администратор';
+
 // Distance driven since the last oil change after which the car is flagged (soft,
 // non-blocking) as needing an oil change.
 var OIL_CHANGE_INTERVAL_KM = 10000;
@@ -66,11 +74,15 @@ var TABS = {
 
 var DEFAULT_HEADERS = {
 
+  // Authentication is password-based (per-user, self-set on first login). The legacy
+  // 'pin_hash' column is left untouched on already-deployed sheets; new sheets use
+  // 'password_hash' + 'password_configured'. See migrateAdminsAndAuth().
   Employees: [
     'employee_id',
     'name',
     'role',
-    'pin_hash',
+    'password_hash',
+    'password_configured',
     'active'
   ],
 
@@ -520,6 +532,45 @@ function hashPin(pin) {
 }
 
 
+// Passwords use the same salted SHA-256 as the legacy PIN hashing (the stored salt is
+// reused), so only a secure hash is ever persisted — never the plain-text password.
+var MIN_PASSWORD_LEN = 4;
+
+function hashPassword(password) {
+  return hashPin(password);
+}
+
+// Strict truthiness for the password_configured flag: a BLANK cell must read as
+// "not configured" (normalizeBoolean treats '' as true, which is wrong here).
+function isConfiguredFlag(value) {
+  if (value === true) {
+    return true;
+  }
+  var s = String(value).toLowerCase().trim();
+  return s === 'true' || s === '1' || s === 'yes' || s === 'да';
+}
+
+// Header-aware writes so auth columns work regardless of physical column order on
+// already-deployed sheets (which still carry the old 'pin_hash' column).
+function setRowCells(sheet, row, obj) {
+  Object.keys(obj).forEach(function(header) {
+    sheet.getRange(row, ensureColumn(sheet, header)).setValue(obj[header]);
+  });
+}
+
+function appendRowByHeaders(sheet, obj) {
+  var lastCol = sheet.getLastColumn();
+  var headers = sheet
+    .getRange(1, 1, 1, lastCol)
+    .getValues()[0]
+    .map(function(h) { return String(h).trim(); });
+  var row = headers.map(function(h) {
+    return Object.prototype.hasOwnProperty.call(obj, h) ? obj[h] : '';
+  });
+  sheet.appendRow(row);
+}
+
+
 /* ============================================================================
  * AUDIT
  * ========================================================================== */
@@ -606,8 +657,9 @@ function getEmployeesForLogin() {
       return {
         employee_id: employee.employee_id,
         name: employee.name,
-        // The login screen only asks admins for a PIN (simplified staff login).
-        requires_pin: String(employee.role) === 'admin'
+        // Whether this user has already set a personal password. When false, the
+        // login screen shows the first-time "create password" flow instead.
+        password_configured: isConfiguredFlag(employee.password_configured)
       };
     });
 
@@ -683,20 +735,13 @@ function saveEmployee(params, ctx) {
       return fail('employee_not_found');
     }
 
-    sheet.getRange(
-      existing.__row,
-      1,
-      1,
-      5
-    ).setValues([[
-      existing.employee_id,
-      employee.name,
-      role,
-      existing.pin_hash,
-      employee.active === false
-        ? false
-        : true
-    ]]);
+    // Update only name / role / active — never touch the password columns here, so an
+    // edit can't clear or expose a user's self-set password.
+    setRowCells(sheet, existing.__row, {
+      name: employee.name,
+      role: role,
+      active: employee.active === false ? false : true
+    });
 
     audit(
       ctx.user,
@@ -713,23 +758,16 @@ function saveEmployee(params, ctx) {
 
   var id = genId('EMP');
 
-  var initialPin =
-    String(employee.pin || '1234');
-
-  sheet.appendRow([
-
-    id,
-
-    employee.name,
-
-    role,
-
-    hashPin(initialPin),
-
-    employee.active === false
-      ? false
-      : true
-  ]);
+  // New users have NO password yet — they set their own on first login. No shared
+  // default is ever stored.
+  appendRowByHeaders(sheet, {
+    employee_id: id,
+    name: employee.name,
+    role: role,
+    password_hash: '',
+    password_configured: false,
+    active: employee.active === false ? false : true
+  });
 
   audit(
     ctx.user,
@@ -788,7 +826,10 @@ function deleteEmployee(params, ctx) {
 }
 
 
-function resetEmployeePin(params, ctx) {
+// Admin: reset another user's password. The admin never sets or sees a password —
+// the stored hash is cleared and the account is marked as requiring setup, so the user
+// creates a new password on their next login. Existing sessions are invalidated.
+function resetEmployeePassword(params, ctx) {
 
   var notAdmin = requireAdmin(ctx);
 
@@ -799,13 +840,7 @@ function resetEmployeePin(params, ctx) {
   var employeeId =
     params.employeeId;
 
-  var pin =
-    String(params.pin || '');
-
-  if (
-    !employeeId ||
-    pin.length < 4
-  ) {
+  if (!employeeId) {
     return fail('validation');
   }
 
@@ -815,19 +850,47 @@ function resetEmployeePin(params, ctx) {
     return fail('employee_not_found');
   }
 
-  getTab(TABS.EMPLOYEES)
-    .getRange(employee.__row, 4)
-    .setValue(hashPin(pin));
+  var sheet = getTab(TABS.EMPLOYEES);
+
+  setRowCells(sheet, employee.__row, {
+    password_hash: '',
+    password_configured: false
+  });
+
+  invalidateEmployeeSessions(employeeId);
 
   audit(
     ctx.user,
-    'employee_pin_reset',
+    'employee_password_reset',
     'employee',
     employeeId,
     ''
   );
 
   return ok({});
+}
+
+
+// Remove every active session for an employee (used on password reset).
+function invalidateEmployeeSessions(employeeId) {
+
+  var sheet = getTab(TABS.SESSIONS);
+
+  var sessions = readObjects(TABS.SESSIONS);
+
+  var rows = [];
+
+  for (var i = 0; i < sessions.length; i++) {
+    if (String(sessions[i].employee_id) === String(employeeId)) {
+      rows.push(sessions[i].__row);
+    }
+  }
+
+  rows
+    .sort(function(a, b) { return b - a; })
+    .forEach(function(rowNumber) {
+      sheet.deleteRow(rowNumber);
+    });
 }
 
 
@@ -840,8 +903,10 @@ function login(params) {
   var employeeId =
     params.employeeId;
 
-  var pin =
-    params.pin;
+  // The password field carries the entered password on a normal login, and the chosen
+  // password on a first-time setup (the client validates the confirm field).
+  var password =
+    params.password;
 
   if (!employeeId) {
     return fail('validation');
@@ -851,26 +916,49 @@ function login(params) {
     findEmployee(employeeId);
 
   if (!employee) {
-    return fail('invalid_pin');
+    return fail('invalid_credentials');
   }
 
   if (!normalizeBoolean(employee.active)) {
     return fail('employee_inactive');
   }
 
-  // Only administrators authenticate with a PIN; ordinary staff sign in simply by
-  // selecting their name (simplified staff login).
-  if (String(employee.role) === 'admin') {
+  var configured = isConfiguredFlag(employee.password_configured);
 
-    if (!pin) {
+  if (!configured) {
+
+    // First login: establish the user's own password now, then log them in.
+    if (!password || String(password).length < MIN_PASSWORD_LEN) {
+      return fail('weak_password');
+    }
+
+    var sheet = getTab(TABS.EMPLOYEES);
+
+    setRowCells(sheet, employee.__row, {
+      password_hash: hashPassword(String(password)),
+      password_configured: true
+    });
+
+    audit(
+      publicUser(employee),
+      'password_created',
+      'employee',
+      employee.employee_id,
+      ''
+    );
+
+  } else {
+
+    // Normal login: verify the previously set password.
+    if (!password) {
       return fail('validation');
     }
 
     if (
-      hashPin(pin) !==
-      String(employee.pin_hash)
+      hashPassword(String(password)) !==
+      String(employee.password_hash)
     ) {
-      return fail('invalid_pin');
+      return fail('invalid_credentials');
     }
   }
 
@@ -3132,6 +3220,13 @@ function saveAvailability(params, ctx) {
   }
 
 
+  // Administrators review the team's requests but never submit their own shifts.
+  // Enforced on the backend, not just hidden in the UI.
+  if (String(ctx.user.role) === 'admin') {
+    return fail('admin_no_availability');
+  }
+
+
   if (
     getSetting(
       'availability_open'
@@ -3441,6 +3536,89 @@ function nextMondayISO() {
 
 
 /* ============================================================================
+ * MIGRATION — run once on the already-deployed Fleet App Data sheet
+ * ========================================================================== */
+
+// Space-insensitive name key for matching existing rows (mirrors the frontend's
+// nameKey), so "В. ПЕТКОВ" matches "В.ПЕТКОВ" regardless of spacing/case.
+function nameKeyBG(value) {
+  return String(value || '').toLowerCase().replace(/\s+/g, '');
+}
+
+/**
+ * RUN THIS ONCE after pasting the updated Backend.gs (Apps Script editor → select
+ * migrateAdminsAndAuth → Run). Idempotent: safe to run more than once.
+ *
+ * It:
+ *   1. adds the password_hash / password_configured columns if missing;
+ *   2. forces EVERY user to set a personal password on next login (clears any hash,
+ *      password_configured = false) — no shared/default password survives;
+ *   3. promotes the named real users to the 'admin' role, creating ЦЕЦО / СИМО if
+ *      they don't exist yet;
+ *   4. deactivates and demotes the generic shared 'Администратор' account.
+ *
+ * Existing employee rows (and their IDs, referenced by usage/maintenance/availability/
+ * audit history) are updated in place — never recreated.
+ */
+function migrateAdminsAndAuth() {
+
+  var sheet = getTab(TABS.EMPLOYEES);
+
+  // 1) Ensure the auth columns exist.
+  ensureColumn(sheet, 'password_hash');
+  ensureColumn(sheet, 'password_configured');
+
+  // 2) Reset everyone to "must set a personal password on next login".
+  readObjects(TABS.EMPLOYEES).forEach(function(e) {
+    setRowCells(sheet, e.__row, {
+      password_hash: '',
+      password_configured: false
+    });
+  });
+
+  // 3) Promote named admins; create the ones that must exist.
+  var byKey = {};
+  readObjects(TABS.EMPLOYEES).forEach(function(e) {
+    byKey[nameKeyBG(e.name)] = e;
+  });
+
+  ADMIN_USER_NAMES.forEach(function(name) {
+    var existing = byKey[nameKeyBG(name)];
+    if (existing) {
+      setRowCells(sheet, existing.__row, { role: 'admin', active: true });
+      Logger.log('Promoted to admin: ' + name);
+    }
+  });
+
+  ADMIN_MUST_EXIST.forEach(function(name) {
+    if (!byKey[nameKeyBG(name)]) {
+      var id = genId('EMP');
+      appendRowByHeaders(sheet, {
+        employee_id: id,
+        name: name,
+        role: 'admin',
+        password_hash: '',
+        password_configured: false,
+        active: true
+      });
+      Logger.log('Created admin: ' + name + ' (' + id + ')');
+    }
+  });
+
+  // 4) Retire the generic shared account (deactivate + demote — keeps its id/history
+  //    intact but removes it from login and strips admin rights).
+  readObjects(TABS.EMPLOYEES).forEach(function(e) {
+    if (nameKeyBG(e.name) === nameKeyBG(LEGACY_ADMIN_NAME)) {
+      setRowCells(sheet, e.__row, { active: false, role: 'employee' });
+      Logger.log('Retired legacy account: ' + e.name);
+    }
+  });
+
+  Logger.log('migrateAdminsAndAuth complete.');
+}
+
+
+/* ============================================================================
  * SETUP
  * ========================================================================== */
 
@@ -3561,12 +3739,9 @@ function setup() {
 
 
   /**
-   * Seed initial administrator.
-   *
-   * TEST LOGIN:
-   *
-   * Администратор
-   * PIN: 1234
+   * Seed the named administrators on a brand-new install. Administration belongs to
+   * real people — there is no shared "Администратор" account. Each seeded admin sets
+   * their own password on first login (password_configured = false).
    */
   var employees =
     readObjects(
@@ -3578,32 +3753,25 @@ function setup() {
     employees.length === 0
   ) {
 
-    var id =
-      genId('EMP');
+    var empSheet = getTab(TABS.EMPLOYEES);
 
+    ADMIN_USER_NAMES.forEach(function(name) {
 
-    getTab(
-      TABS.EMPLOYEES
-    )
-      .appendRow([
+      var id = genId('EMP');
 
-        id,
+      appendRowByHeaders(empSheet, {
+        employee_id: id,
+        name: name,
+        role: 'admin',
+        password_hash: '',
+        password_configured: false,
+        active: true
+      });
 
-        'Администратор',
-
-        'admin',
-
-        hashPin('1234'),
-
-        true
-      ]);
-
-
-    Logger.log(
-      'Admin created: ' +
-      id +
-      ' / PIN 1234'
-    );
+      Logger.log(
+        'Admin seeded: ' + name + ' (' + id + ') — password set on first login'
+      );
+    });
   }
 
 
@@ -3803,17 +3971,16 @@ function dedupeFleetCars() {
  * ========================================================================== */
 
 /**
- * Optional manual helper.
- *
- * Change values before running.
+ * Optional manual helper — directly set a user's password (e.g. to bootstrap an admin
+ * without the login flow). Change values before running. Stores only the hash.
  */
-function setEmployeePinManual() {
+function setEmployeePasswordManual() {
 
   var EMPLOYEE_ID =
     'EMP-CHANGE-ME';
 
-  var NEW_PIN =
-    '1234';
+  var NEW_PASSWORD =
+    'change-me';
 
 
   var employee =
@@ -3832,22 +3999,18 @@ function setEmployeePinManual() {
   }
 
 
-  getTab(
-    TABS.EMPLOYEES
-  )
-    .getRange(
-      employee.__row,
-      4
-    )
-    .setValue(
-      hashPin(
-        NEW_PIN
-      )
-    );
+  setRowCells(
+    getTab(TABS.EMPLOYEES),
+    employee.__row,
+    {
+      password_hash: hashPassword(NEW_PASSWORD),
+      password_configured: true
+    }
+  );
 
 
   Logger.log(
-    'PIN changed.'
+    'Password set for ' + employee.name + '.'
   );
 }
 
@@ -3989,8 +4152,14 @@ var ROUTES = {
     lock: true
   },
 
+  resetEmployeePassword: {
+    fn: resetEmployeePassword,
+    lock: true
+  },
+
+  // Backward-compatible alias for any client still calling the old action name.
   resetEmployeePin: {
-    fn: resetEmployeePin,
+    fn: resetEmployeePassword,
     lock: true
   },
 

@@ -2,13 +2,12 @@ import { useEffect, useMemo, useState } from 'react'
 import {
   getEmployees,
   saveEmployee,
-  resetEmployeePin,
+  resetEmployeePassword,
   deleteEmployee,
 } from '../../services/employees/employees.js'
 import { useToast } from '../../context/ToastContext.jsx'
 import { useAuth } from '../../context/AuthContext.jsx'
 import Spinner from '../Spinner.jsx'
-import Modal from '../Modal.jsx'
 import EmployeeModal from './EmployeeModal.jsx'
 import ConfirmModal from '../ConfirmModal.jsx'
 
@@ -101,7 +100,7 @@ export default function AdminEmployees() {
                 Редактирай
               </button>
               <button className="btn btn--ghost btn--sm" onClick={() => setResetting(e)}>
-                PIN
+                Нулирай парола
               </button>
               {e.employee_id !== user?.employee_id ? (
                 <button className="btn btn--danger-ghost btn--sm" onClick={() => setDeleting(e)}>
@@ -123,13 +122,26 @@ export default function AdminEmployees() {
       ) : null}
 
       {resetting ? (
-        <ResetPinModal
-          employee={resetting}
-          onClose={() => setResetting(null)}
-          onDone={() => {
-            setResetting(null)
-            showToast('PIN е нулиран.', 'success')
+        <ConfirmModal
+          title={`Нулиране на парола — ${resetting.name}`}
+          message={`Паролата на ${resetting.name} ще бъде премахната и потребителят ще създаде нова при следващото си влизане. Активните му сесии ще бъдат прекратени. Продължавате ли?`}
+          confirmLabel="Нулирай парола"
+          busyLabel="Нулиране…"
+          danger={false}
+          onConfirm={async () => {
+            setBusy(true)
+            try {
+              await resetEmployeePassword(resetting.employee_id)
+              setResetting(null)
+              showToast('Паролата е нулирана. Потребителят ще създаде нова при следващо влизане.', 'success')
+            } catch (e) {
+              showToast(e.message || 'Възникна проблем.', 'error')
+            } finally {
+              setBusy(false)
+            }
           }}
+          onClose={() => setResetting(null)}
+          busy={busy}
         />
       ) : null}
 
@@ -143,59 +155,5 @@ export default function AdminEmployees() {
         />
       ) : null}
     </div>
-  )
-}
-
-function ResetPinModal({ employee, onClose, onDone }) {
-  const { showToast } = useToast()
-  const [pin, setPin] = useState('')
-  const [busy, setBusy] = useState(false)
-  const [error, setError] = useState('')
-
-  async function submit() {
-    if (!/^\d{4,6}$/.test(pin)) return setError('PIN трябва да е 4–6 цифри.')
-    setBusy(true)
-    try {
-      await resetEmployeePin(employee.employee_id, pin)
-      onDone()
-    } catch (e) {
-      showToast(e.message || 'Възникна проблем.', 'error')
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  return (
-    <Modal
-      title={`Нов PIN — ${employee.name}`}
-      onClose={onClose}
-      footer={
-        <>
-          <button className="btn btn--ghost" onClick={onClose} disabled={busy}>
-            Отказ
-          </button>
-          <button className="btn btn--primary" onClick={submit} disabled={busy}>
-            {busy ? 'Записване…' : 'Нулирай PIN'}
-          </button>
-        </>
-      }
-    >
-      <label className="field">
-        <span className="field__label">Нов PIN (4–6 цифри)</span>
-        <input
-          className="input"
-          inputMode="numeric"
-          maxLength={6}
-          value={pin}
-          onChange={(e) => setPin(e.target.value.replace(/\D/g, ''))}
-          autoFocus
-        />
-      </label>
-      {error ? (
-        <p className="form-error" role="alert">
-          {error}
-        </p>
-      ) : null}
-    </Modal>
   )
 }

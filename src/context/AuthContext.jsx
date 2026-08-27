@@ -17,8 +17,8 @@ export function AuthProvider({ children }) {
     }
   }, [])
 
-  const login = useCallback(async (employeeId, pin) => {
-    const u = await apiLogin(employeeId, pin)
+  const login = useCallback(async (employeeId, password) => {
+    const u = await apiLogin(employeeId, password)
     setUser(u)
     return u
   }, [])

@@ -6,6 +6,7 @@ export default function ConfirmModal({
   message,
   confirmLabel = 'Изтрий',
   cancelLabel = 'Отказ',
+  busyLabel = 'Изтриване…',
   onConfirm,
   onClose,
   busy = false,
@@ -25,7 +26,7 @@ export default function ConfirmModal({
             onClick={onConfirm}
             disabled={busy}
           >
-            {busy ? 'Изтриване…' : confirmLabel}
+            {busy ? busyLabel : confirmLabel}
           </button>
         </>
       }

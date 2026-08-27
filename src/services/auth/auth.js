@@ -30,8 +30,11 @@ function clearSession() {
   cacheUser(null)
 }
 
-export async function login(employeeId, pin) {
-  const data = await api('login', { employeeId, pin })
+// Log in with the user's personal password. On a first login (password not yet
+// configured) the same call sets the chosen password server-side and logs in.
+// The password is only ever passed through to the backend — never stored on the device.
+export async function login(employeeId, password) {
+  const data = await api('login', { employeeId, password })
   if (data?.token) setToken(data.token)
   cacheUser(data?.user || null)
   return data?.user || null

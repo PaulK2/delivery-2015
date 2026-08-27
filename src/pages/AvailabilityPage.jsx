@@ -129,34 +129,39 @@ export default function AvailabilityPage() {
       <h1 className="page__title">Следваща седмица</h1>
       <p className="page__subtitle">Наличност за седмица {weekLabel}</p>
 
-      <div className={'banner ' + (canEdit ? 'banner--ok' : 'banner--warn')}>
-        {weekendLocked
-          ? 'Заявките за смени вече не могат да се редактират — приемът е заключен за събота и неделя.'
-          : open
-            ? 'Приемът на наличност е отворен. Изберете кога сте на разположение.'
-            : 'Приемът на наличност е затворен. Можете само да преглеждате.'}
+      <div className={'banner ' + (isAdmin ? 'banner--info' : canEdit ? 'banner--ok' : 'banner--warn')}>
+        {isAdmin
+          ? 'Преглед на заявките на екипа. Администраторите не подават собствени заявки за смени.'
+          : weekendLocked
+            ? 'Заявките за смени вече не могат да се редактират — приемът е заключен за събота и неделя.'
+            : open
+              ? 'Приемът на наличност е отворен. Изберете кога сте на разположение.'
+              : 'Приемът на наличност е затворен. Можете само да преглеждате.'}
       </div>
 
-      {/* My availability editor */}
-      <section className="detail-section">
-        <h2 className="detail-section__title">Моята наличност</h2>
-        <div className="day-list">
-          {dates.map((d) => (
-            <DayShiftSelector
-              key={d}
-              date={d}
-              value={mine[d]}
-              disabled={!canEdit}
-              onChange={(v) => setMine((m) => ({ ...m, [d]: v }))}
-            />
-          ))}
-        </div>
-        {canEdit ? (
-          <button className="btn btn--primary btn--block" onClick={onSave} disabled={saving}>
-            {saving ? 'Записване…' : 'Запази наличността'}
-          </button>
-        ) : null}
-      </section>
+      {/* My availability editor — regular users only. Admins review the team but never
+          submit their own shifts (also enforced by the backend). */}
+      {!isAdmin ? (
+        <section className="detail-section">
+          <h2 className="detail-section__title">Моята наличност</h2>
+          <div className="day-list">
+            {dates.map((d) => (
+              <DayShiftSelector
+                key={d}
+                date={d}
+                value={mine[d]}
+                disabled={!canEdit}
+                onChange={(v) => setMine((m) => ({ ...m, [d]: v }))}
+              />
+            ))}
+          </div>
+          {canEdit ? (
+            <button className="btn btn--primary btn--block" onClick={onSave} disabled={saving}>
+              {saving ? 'Записване…' : 'Запази наличността'}
+            </button>
+          ) : null}
+        </section>
+      ) : null}
 
       {/* Team overview — the full list of everyone's requests is admin-only. */}
       {isAdmin ? (

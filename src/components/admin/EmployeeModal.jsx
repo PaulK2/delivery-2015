@@ -7,18 +7,15 @@ export default function EmployeeModal({ employee, onClose, onSubmit, submitting 
   const [name, setName] = useState(employee?.name || '')
   const [role, setRole] = useState(employee?.role || 'employee')
   const [active, setActive] = useState(employee ? employee.active : true)
-  const [pin, setPin] = useState('')
   const [error, setError] = useState('')
 
   function submit() {
     if (!name.trim()) return setError('Въведете име.')
-    if (isNew && !/^\d{4,6}$/.test(pin)) return setError('PIN трябва да е 4–6 цифри.')
     onSubmit({
       employee_id: employee?.employee_id,
       name: name.trim(),
       role,
       active,
-      ...(isNew ? { pin } : {}),
     })
   }
 
@@ -49,16 +46,9 @@ export default function EmployeeModal({ employee, onClose, onSubmit, submitting 
         </select>
       </label>
       {isNew ? (
-        <label className="field">
-          <span className="field__label">Начален PIN (4–6 цифри)</span>
-          <input
-            className="input"
-            inputMode="numeric"
-            maxLength={6}
-            value={pin}
-            onChange={(e) => setPin(e.target.value.replace(/\D/g, ''))}
-          />
-        </label>
+        <p className="field__hint">
+          Служителят създава своя парола при първото си влизане.
+        </p>
       ) : null}
       <label className="checkbox">
         <input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} />

@@ -485,6 +485,11 @@ button {
   color: var(--warning-text);
   border: 1px solid #f0dfb0;
 }
+.banner--info {
+  background: var(--accent-bg);
+  color: var(--accent-dark);
+  border: 1px solid var(--accent-border);
+}
 .empty-state {
   background: var(--surface);
   border: 1px dashed var(--border);
@@ -538,6 +543,12 @@ button {
   color: var(--muted);
   font-size: 13px;
   margin: 0;
+}
+.login-card__hint {
+  color: var(--accent-dark);
+  font-size: 13px;
+  margin: 0 0 4px;
+  text-align: center;
 }
 /* Employee name picker: minimalistic and centered — a hollow ("empty inside")
    transparent box with just an underline, and bright-red bold names. The selected

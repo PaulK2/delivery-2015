@@ -12,10 +12,13 @@ export default function LoginPage() {
 
   const [employees, setEmployees] = useState(null)
   const [employeeId, setEmployeeId] = useState('')
-  const [pin, setPin] = useState('')
+  const [password, setPassword] = useState('')
+  const [confirm, setConfirm] = useState('')
   const [error, setError] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [loadError, setLoadError] = useState('')
+
+  const MIN_PASSWORD_LEN = 4
 
   useEffect(() => {
     let alive = true
@@ -29,13 +32,14 @@ export default function LoginPage() {
 
   if (isAuthenticated) return <Navigate to="/" replace />
 
-  // Only administrators sign in with a PIN; ordinary staff just pick their name.
   const selected = employees?.find((emp) => emp.employee_id === employeeId)
-  const needsPin = !!selected?.requires_pin
+  // First login: the user has no password yet and must create one now.
+  const firstTime = !!selected && selected.password_configured === false
 
   function onSelectEmployee(id) {
     setEmployeeId(id)
-    setPin('')
+    setPassword('')
+    setConfirm('')
     setError('')
   }
 
@@ -43,15 +47,23 @@ export default function LoginPage() {
     e.preventDefault()
     setError('')
     if (!employeeId) return setError('Изберете служител.')
-    if (needsPin && !/^\d{4,6}$/.test(pin)) return setError('PIN трябва да е 4–6 цифри.')
+    if (!password) return setError('Въведете парола.')
+
+    if (firstTime) {
+      if (password.length < MIN_PASSWORD_LEN)
+        return setError(`Паролата трябва да е поне ${MIN_PASSWORD_LEN} символа.`)
+      if (password !== confirm) return setError('Паролите не съвпадат.')
+    }
 
     setSubmitting(true)
     try {
-      await login(employeeId, needsPin ? pin : '')
+      // For a first login this same call sets the chosen password server-side.
+      await login(employeeId, password)
       navigate('/', { replace: true })
     } catch (err) {
       setError(err.message || 'Входът е неуспешен.')
-      setPin('')
+      setPassword('')
+      setConfirm('')
     } finally {
       setSubmitting(false)
     }
@@ -93,21 +105,41 @@ export default function LoginPage() {
               </select>
             </label>
 
-            {needsPin ? (
-              <label className="field">
-                <span className="field__label">PIN</span>
-                <input
-                  className="input"
-                  type="password"
-                  inputMode="numeric"
-                  autoComplete="current-password"
-                  maxLength={6}
-                  value={pin}
-                  onChange={(e) => setPin(e.target.value.replace(/\D/g, ''))}
-                  placeholder="••••"
-                  autoFocus
-                />
-              </label>
+            {selected ? (
+              <>
+                {firstTime ? (
+                  <p className="login-card__hint">
+                    Първо влизане: създайте своя парола.
+                  </p>
+                ) : null}
+
+                <label className="field">
+                  <span className="field__label">{firstTime ? 'Нова парола' : 'Парола'}</span>
+                  <input
+                    className="input"
+                    type="password"
+                    autoComplete={firstTime ? 'new-password' : 'current-password'}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="••••••"
+                    autoFocus
+                  />
+                </label>
+
+                {firstTime ? (
+                  <label className="field">
+                    <span className="field__label">Потвърдете паролата</span>
+                    <input
+                      className="input"
+                      type="password"
+                      autoComplete="new-password"
+                      value={confirm}
+                      onChange={(e) => setConfirm(e.target.value)}
+                      placeholder="••••••"
+                    />
+                  </label>
+                ) : null}
+              </>
             ) : null}
 
             {error ? (
@@ -117,7 +149,13 @@ export default function LoginPage() {
             ) : null}
 
             <button className="btn btn--primary btn--block" disabled={submitting}>
-              {submitting ? 'Влизане…' : 'Вход'}
+              {submitting
+                ? firstTime
+                  ? 'Създаване…'
+                  : 'Влизане…'
+                : firstTime
+                  ? 'Създай парола и влез'
+                  : 'Вход'}
             </button>
           </form>
         )}

@@ -165,6 +165,9 @@ function mapErrorBG(code) {
   const M = {
     unauthorized: 'Сесията е изтекла. Влезте отново.',
     forbidden: 'Нямате права за това действие.',
+    invalid_credentials: 'Грешна парола. Опитайте отново.',
+    weak_password: 'Паролата трябва да е поне 4 символа.',
+    admin_no_availability: 'Администраторите не подават заявки за смени.',
     invalid_pin: 'Грешен PIN. Опитайте отново.',
     employee_inactive: 'Профилът ви е деактивиран.',
     car_taken: 'Автомобилът вече е взет от друг служител.',
