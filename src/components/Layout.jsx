@@ -130,7 +130,7 @@ export default function Layout() {
           ))}
         </nav>
 
-        <main className="app-main">
+        <main className={'app-main' + (isHome ? ' app-main--home' : '')}>
           <Outlet context={outletContext} />
         </main>
       </div>

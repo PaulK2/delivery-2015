@@ -547,7 +547,11 @@ button {
 }
 .home__map {
   position: relative;
-  height: 52vh;
+  /* Fill the screen from under the sticky top bar down to just above the bottom
+     nav, so there is no blank space; the shift panel flows below (page scrolls).
+     dvh tracks the mobile browser's collapsing UI; vh is the fallback. */
+  height: calc(100vh - var(--header-h) - var(--bottomnav-h) - 24px);
+  height: calc(100dvh - var(--header-h) - var(--bottomnav-h) - 24px);
   min-height: 320px;
   border-radius: var(--radius);
   overflow: hidden;
@@ -992,18 +996,33 @@ a.schedule-item__car--link:hover {
     color: inherit;
   }
 
-  /* Home: map left, panel right (spec §67) */
+  /* Home: map left, panel right (spec §67). The whole view fills the main area
+     (top bar → bottom of page) with no page scroll, so the map has no blank space
+     below it; the right-hand shift panel keeps its width and scrolls internally. */
+  .app-main--home {
+    overflow: hidden;
+  }
+  .home {
+    height: calc(100vh - var(--header-h) - 48px); /* 48 = app-main top+bottom padding */
+    height: calc(100dvh - var(--header-h) - 48px);
+    display: flex;
+    flex-direction: column;
+  }
   .home__layout {
+    flex: 1;
+    min-height: 0;
     flex-direction: row;
     align-items: stretch;
   }
   .home__map {
     flex: 1;
-    height: 68vh;
+    height: 100%;
   }
   .home__side {
     width: 340px;
     flex-shrink: 0;
+    height: 100%;
+    overflow-y: auto;
   }
 }
 
