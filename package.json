@@ -7,7 +7,8 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "npm run build && wrangler dev",
+    "deploy": "npm run build && wrangler deploy"
   },
   "dependencies": {
     "leaflet": "^1.9.4",
@@ -17,7 +18,9 @@
     "react-router-dom": "^6.26.2"
   },
   "devDependencies": {
+    "@cloudflare/vite-plugin": "^1.54.1",
     "@vitejs/plugin-react": "^4.3.4",
-    "vite": "^5.4.11"
+    "vite": "^7.3.6",
+    "wrangler": "^4.127.0"
   }
 }
