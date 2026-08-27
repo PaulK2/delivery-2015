@@ -1,7 +1,34 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet'
 import L from 'leaflet'
 import { CONFIG } from '../config/index.js'
+
+// True on phone-sized screens (matches the 900px desktop breakpoint in global.css).
+function useIsMobile() {
+  const query = '(max-width: 899px)'
+  const [isMobile, setIsMobile] = useState(
+    () => typeof window !== 'undefined' && window.matchMedia(query).matches
+  )
+  useEffect(() => {
+    const mq = window.matchMedia(query)
+    const onChange = () => setIsMobile(mq.matches)
+    mq.addEventListener('change', onChange)
+    return () => mq.removeEventListener('change', onChange)
+  }, [])
+  return isMobile
+}
+
+// On mobile, single-finger dragging is disabled by default so a vertical swipe scrolls
+// the page (and reaches today's employee list below the map) instead of panning the map.
+// Panning is enabled only after a deliberate tap. On desktop, dragging is always on.
+function DragGate({ mobile, active }) {
+  const map = useMap()
+  useEffect(() => {
+    if (!mobile || active) map.dragging.enable()
+    else map.dragging.disable()
+  }, [mobile, active, map])
+  return null
+}
 
 // Pans/zooms the map to a focus point (the user's restaurant for the viewed day).
 // When focus is cleared — the user has no shift that day — the map flies back to the
@@ -37,24 +64,28 @@ function pinIcon(count, selected) {
 
 export default function SofiaMap({ locations, countsByLocation, selectedId, onSelect, focus }) {
   const center = [CONFIG.map.defaultLat, CONFIG.map.defaultLng]
+  const isMobile = useIsMobile()
+  const [dragActive, setDragActive] = useState(false)
 
   return (
-    <MapContainer
-      center={center}
-      zoom={CONFIG.map.defaultZoom}
-      minZoom={CONFIG.map.minZoom}
-      maxZoom={CONFIG.map.maxZoom}
-      scrollWheelZoom
-      className="sofia-map"
-    >
-      <TileLayer url={CONFIG.map.tileUrl} attribution={CONFIG.map.tileAttribution} />
-      <FocusController
-        focus={focus}
-        zoom={CONFIG.map.focusZoom || 15}
-        defaultCenter={center}
-        defaultZoom={CONFIG.map.defaultZoom}
-      />
-      {locations.map((loc) => {
+    <div className="sofia-map-wrap">
+      <MapContainer
+        center={center}
+        zoom={CONFIG.map.defaultZoom}
+        minZoom={CONFIG.map.minZoom}
+        maxZoom={CONFIG.map.maxZoom}
+        scrollWheelZoom
+        className="sofia-map"
+      >
+        <TileLayer url={CONFIG.map.tileUrl} attribution={CONFIG.map.tileAttribution} />
+        <DragGate mobile={isMobile} active={dragActive} />
+        <FocusController
+          focus={focus}
+          zoom={CONFIG.map.focusZoom || 15}
+          defaultCenter={center}
+          defaultZoom={CONFIG.map.defaultZoom}
+        />
+        {locations.map((loc) => {
         if (loc.latitude == null || loc.longitude == null) return null
         const count = countsByLocation[loc.location_id] || 0
         return (
@@ -71,7 +102,18 @@ export default function SofiaMap({ locations, countsByLocation, selectedId, onSe
             </Popup>
           </Marker>
         )
-      })}
-    </MapContainer>
+        })}
+      </MapContainer>
+
+      {isMobile && !dragActive ? (
+        <button
+          type="button"
+          className="map-drag-hint"
+          onClick={() => setDragActive(true)}
+        >
+          Докоснете картата, за да я преместите
+        </button>
+      ) : null}
+    </div>
   )
 }

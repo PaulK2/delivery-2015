@@ -588,12 +588,12 @@ button {
 }
 .home__map {
   position: relative;
-  /* Fill the screen from under the sticky top bar down to just above the bottom
-     nav, so there is no blank space; the shift panel flows below (page scrolls).
-     dvh tracks the mobile browser's collapsing UI; vh is the fallback. */
-  height: calc(100vh - var(--header-h) - var(--bottomnav-h) - 24px);
-  height: calc(100dvh - var(--header-h) - var(--bottomnav-h) - 24px);
-  min-height: 320px;
+  /* Mobile-first: the map takes a limited slice of the viewport so today's
+     employee list below it is reachable with a short scroll — never full-screen.
+     Desktop (≥900px) overrides this to fill the split layout. */
+  height: 44vh;
+  min-height: 280px;
+  max-height: 420px;
   border-radius: var(--radius);
   overflow: hidden;
   box-shadow: var(--shadow);
@@ -668,9 +668,39 @@ button {
 .map-datechip__today:hover {
   background: var(--accent-dark);
 }
+.sofia-map-wrap {
+  position: relative;
+  height: 100%;
+  width: 100%;
+}
 .sofia-map {
   height: 100%;
   width: 100%;
+}
+
+/* Mobile-only hint: tap to enable map panning (dragging is off by default on phones
+   so a vertical swipe scrolls the page to today's employee list). */
+.map-drag-hint {
+  position: absolute;
+  bottom: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 600;
+  max-width: calc(100% - 24px);
+  padding: 7px 14px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text-2);
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+  box-shadow: var(--shadow);
+  cursor: pointer;
+  opacity: 0.94;
+}
+.map-drag-hint:active {
+  transform: translateX(-50%) scale(0.96);
 }
 
 .date-nav {
@@ -1058,6 +1088,8 @@ a.schedule-item__car--link:hover {
   .home__map {
     flex: 1;
     height: 100%;
+    min-height: 0;
+    max-height: none; /* undo the mobile clamp so the map fills the split view */
   }
   .home__side {
     width: 340px;
