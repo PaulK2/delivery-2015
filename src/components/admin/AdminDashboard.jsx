@@ -57,14 +57,54 @@ export default function AdminDashboard() {
   return (
     <div>
       <div className="stat-grid">
-        <Stat label="Свободни" value={d.free} tone="ok" />
-        <Stat label="В движение" value={d.inUse} tone="accent" />
-        <Stat label="Недостъпни" value={d.maint} tone={d.maint ? 'danger' : 'muted'} />
-        <Stat label="Общо активни" value={d.total} tone="muted" />
-        <Stat label="Активни сигнали" value={d.issues} tone={d.issues ? 'warn' : 'muted'} />
-        <Stat label="Критични" value={d.critical} tone={d.critical ? 'danger' : 'muted'} />
-        <Stat label="Изтичащи документи" value={d.expiring} tone={d.expiring ? 'warn' : 'muted'} />
-        <Stat label="Неподали наличност" value={d.notSubmitted} tone={d.notSubmitted ? 'warn' : 'muted'} />
+        <Stat
+          label="Свободни"
+          value={d.free}
+          tone="ok"
+          desc="Автомобили, които са свободни и могат да бъдат поети в момента."
+        />
+        <Stat
+          label="В движение"
+          value={d.inUse}
+          tone="accent"
+          desc="Автомобили, които в момента се управляват от служител."
+        />
+        <Stat
+          label="Недостъпни"
+          value={d.maint}
+          tone={d.maint ? 'danger' : 'muted'}
+          desc="Автомобили в ремонт или поддръжка — временно извън употреба."
+        />
+        <Stat
+          label="Общо активни"
+          value={d.total}
+          tone="muted"
+          desc="Общ брой активни автомобили в автопарка (без изтритите)."
+        />
+        <Stat
+          label="Активни сигнали"
+          value={d.issues}
+          tone={d.issues ? 'warn' : 'muted'}
+          desc="Неотстранени сигнали за проблеми по автомобилите."
+        />
+        <Stat
+          label="Критични"
+          value={d.critical}
+          tone={d.critical ? 'danger' : 'muted'}
+          desc="Активни сигнали с критична сериозност — изискват спешна намеса."
+        />
+        <Stat
+          label="Изтичащи документи"
+          value={d.expiring}
+          tone={d.expiring ? 'warn' : 'muted'}
+          desc="Застраховки и прегледи, които изтичат скоро или вече са изтекли."
+        />
+        <Stat
+          label="Неподали наличност"
+          value={d.notSubmitted}
+          tone={d.notSubmitted ? 'warn' : 'muted'}
+          desc="Активни служители, които още не са подали наличност за седмицата."
+        />
       </div>
 
       <div className="availability-note">
@@ -77,11 +117,12 @@ export default function AdminDashboard() {
   )
 }
 
-function Stat({ label, value, tone }) {
+function Stat({ label, value, tone, desc }) {
   return (
     <div className={'stat stat--' + tone}>
       <div className="stat__value">{value}</div>
       <div className="stat__label">{label}</div>
+      {desc ? <div className="stat__desc">{desc}</div> : null}
     </div>
   )
 }

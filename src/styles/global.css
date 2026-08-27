@@ -801,6 +801,47 @@ button {
 .map-pin--selected {
   transform: scale(1.25);
 }
+/* Radar ping emanating from the pin tip on the focused restaurant. A static 12px
+   anchor at the tip; its two pseudo-element rings scale out independently (staggered)
+   in the brand accent, matching the app's orange highlight. */
+.map-pin__pulse {
+  position: absolute;
+  left: 50%;
+  bottom: 1px;
+  width: 12px;
+  height: 12px;
+  margin-left: -6px;
+  pointer-events: none;
+  z-index: -1;
+}
+.map-pin__pulse::before,
+.map-pin__pulse::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: var(--accent);
+  animation: map-pin-pulse 1.8s cubic-bezier(0.2, 0.6, 0.3, 1) infinite;
+}
+.map-pin__pulse::after {
+  animation-delay: 0.9s;
+}
+@keyframes map-pin-pulse {
+  0% {
+    transform: scale(0.5);
+    opacity: 0.5;
+  }
+  80%,
+  100% {
+    transform: scale(3.4);
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .map-pin__pulse {
+    display: none;
+  }
+}
 .map-pin__count {
   position: absolute;
   top: -6px;
@@ -938,11 +979,34 @@ button {
   display: flex;
   align-items: center;
   gap: 8px;
+  width: 100%;
   margin: 0;
   padding: 10px 14px;
   background: var(--surface-2);
-  border-bottom: 1px solid var(--border);
+  border: none;
+  border-bottom: 1px solid transparent;
   font-size: 15px;
+  font-family: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.12s ease;
+}
+.schedule-day__head:hover {
+  background: var(--surface-3, var(--surface-2));
+  filter: brightness(0.98);
+}
+.schedule-day--open .schedule-day__head {
+  border-bottom-color: var(--border);
+}
+.schedule-day__chevron {
+  color: var(--muted);
+  font-size: 12px;
+  transition: transform 0.15s ease;
+  display: inline-block;
+}
+.schedule-day__chevron--open {
+  transform: rotate(90deg);
 }
 .schedule-day__weekday {
   font-weight: 700;
@@ -2355,6 +2419,13 @@ textarea.input {
 .stat__label {
   font-size: 13px;
   color: var(--text-2);
+  font-weight: 600;
+}
+.stat__desc {
+  margin-top: 4px;
+  font-size: 12px;
+  line-height: 1.35;
+  color: var(--muted);
 }
 .availability-note {
   background: var(--surface-2);

@@ -75,6 +75,21 @@ export function scheduleEntriesForDate(entries, iso) {
   return entries.filter((e) => Number(e.day_number) === dom && e.weekday === wd)
 }
 
+// Reconstruct the calendar date (ISO) for a schedule weekday + day-of-month, picking the
+// occurrence nearest today. Lets the schedule page show a real date beside each weekday
+// even though the grid itself only carries a day number. '' when none is nearby.
+export function scheduleDate(weekday, dayNumber) {
+  if (weekday == null || dayNumber == null || dayNumber === '') return ''
+  const dom = Number(dayNumber)
+  const today = new Date(`${todayISO()}T12:00:00`)
+  for (let offset = -10; offset <= 28; offset++) {
+    const d = new Date(today)
+    d.setDate(d.getDate() + offset)
+    if (d.getDay() === weekday && d.getDate() === dom) return isoDateFromParts(d)
+  }
+  return ''
+}
+
 // Monday-first ordering of getDay() indices, for weekly views.
 export const WEEK_ORDER = [1, 2, 3, 4, 5, 6, 0]
 

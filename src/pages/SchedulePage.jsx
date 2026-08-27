@@ -2,7 +2,14 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { getSchedule } from '../services/schedule/schedule.js'
 import { getCars } from '../services/fleet/fleet.js'
-import { weekdayNameByIndex, WEEK_ORDER } from '../utils/datetime.js'
+import {
+  weekdayNameByIndex,
+  WEEK_ORDER,
+  weekdayIndex,
+  todayISO,
+  scheduleDate,
+  formatDateBG,
+} from '../utils/datetime.js'
 import { shiftHours, shiftSortRank, formatPayment, SHIFT_LABELS } from '../utils/shifts.js'
 import { normalizePlate, resolveScheduleCar } from '../utils/vehicles.js'
 import { locationOrderRank } from '../config/index.js'
@@ -45,6 +52,15 @@ export default function SchedulePage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [filters, setFilters] = useState({ employee: '', location: '', shift: '' })
+  // Which day sections are expanded. Start with today's weekday open; the rest collapse.
+  const [openDays, setOpenDays] = useState(() => new Set([weekdayIndex(todayISO())]))
+
+  const toggleDay = (wd) =>
+    setOpenDays((prev) => {
+      const next = new Set(prev)
+      next.has(wd) ? next.delete(wd) : next.add(wd)
+      return next
+    })
 
   async function load() {
     setLoading(true)
@@ -112,7 +128,11 @@ export default function SchedulePage() {
           )
           return [locName, list]
         })
-      result.push([wd, locList])
+      // Real date for this weekday, reconstructed from any entry's day number.
+      const sample = locList[0]?.[1]?.[0]
+      const dateISO = sample ? scheduleDate(wd, sample.day_number) : ''
+      const count = locList.reduce((n, [, list]) => n + list.length, 0)
+      result.push([wd, { dateISO, count, locList }])
     }
     return result
   }, [filtered])
@@ -181,41 +201,56 @@ export default function SchedulePage() {
         <div className="empty-state">Няма записи в графика за избраните филтри.</div>
       ) : (
         <div className="schedule-days">
-          {byWeekday.map(([wd, locs]) => (
-            <section key={wd} className="schedule-day">
-              <h2 className="schedule-day__head">
-                <span className="schedule-day__weekday">{weekdayNameByIndex(wd)}</span>
-                <span className="schedule-day__count">
-                  {locs.reduce((n, [, list]) => n + list.length, 0)}
-                </span>
-              </h2>
+          {byWeekday.map(([wd, { dateISO, count, locList }]) => {
+            const isOpen = openDays.has(wd)
+            return (
+              <section key={wd} className={'schedule-day' + (isOpen ? ' schedule-day--open' : '')}>
+                <button
+                  type="button"
+                  className="schedule-day__head"
+                  aria-expanded={isOpen}
+                  onClick={() => toggleDay(wd)}
+                >
+                  <span
+                    className={'schedule-day__chevron' + (isOpen ? ' schedule-day__chevron--open' : '')}
+                    aria-hidden="true"
+                  >
+                    ▸
+                  </span>
+                  <span className="schedule-day__weekday">{weekdayNameByIndex(wd)}</span>
+                  {dateISO ? <span className="schedule-day__date">{formatDateBG(dateISO)}</span> : null}
+                  <span className="schedule-day__count">{count}</span>
+                </button>
 
-              {locs.map(([locName, entries]) => (
-                <div key={locName} className="schedule-loc">
-                  <h3 className="schedule-loc__head">
-                    <span className="schedule-loc__name">{locName}</span>
-                    <span className="schedule-loc__count">{entries.length}</span>
-                  </h3>
-                  <ul className="schedule-list">
-                    {entries.map((e) => (
-                      <li
-                        key={e.schedule_id}
-                        className={'schedule-item schedule-item--' + e.shift_type}
-                      >
-                        <span className="schedule-item__person">{e.employee_name}</span>
-                        <span className="schedule-item__shift">{SHIFT_LABELS[e.shift_type]}</span>
-                        <ScheduleCar rawCar={e.car} known={knownCars} />
-                        {formatPayment(e.payment) ? (
-                          <span className="schedule-item__pay">{formatPayment(e.payment)}</span>
-                        ) : null}
-                        <span className="schedule-item__hours">{shiftHours(e.shift_type)}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              ))}
-            </section>
-          ))}
+                {isOpen
+                  ? locList.map(([locName, entries]) => (
+                      <div key={locName} className="schedule-loc">
+                        <h3 className="schedule-loc__head">
+                          <span className="schedule-loc__name">{locName}</span>
+                          <span className="schedule-loc__count">{entries.length}</span>
+                        </h3>
+                        <ul className="schedule-list">
+                          {entries.map((e) => (
+                            <li
+                              key={e.schedule_id}
+                              className={'schedule-item schedule-item--' + e.shift_type}
+                            >
+                              <span className="schedule-item__person">{e.employee_name}</span>
+                              <span className="schedule-item__shift">{SHIFT_LABELS[e.shift_type]}</span>
+                              <ScheduleCar rawCar={e.car} known={knownCars} />
+                              {formatPayment(e.payment) ? (
+                                <span className="schedule-item__pay">{formatPayment(e.payment)}</span>
+                              ) : null}
+                              <span className="schedule-item__hours">{shiftHours(e.shift_type)}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    ))
+                  : null}
+              </section>
+            )
+          })}
         </div>
       )}
     </div>

@@ -53,9 +53,11 @@ function FocusController({ focus, zoom, defaultCenter, defaultZoom }) {
 // asset paths under bundlers, and matches the brand accent (spec §7).
 function pinIcon(count, selected) {
   const badge = count > 0 ? `<span class="map-pin__count">${count}</span>` : ''
+  // Radar-style pulse emanating from the pin tip on the focused/selected restaurant.
+  const pulse = selected ? '<span class="map-pin__pulse" aria-hidden="true"></span>' : ''
   return L.divIcon({
     className: 'map-pin-wrap',
-    html: `<div class="map-pin${selected ? ' map-pin--selected' : ''}">📍${badge}</div>`,
+    html: `<div class="map-pin${selected ? ' map-pin--selected' : ''}">${pulse}📍${badge}</div>`,
     iconSize: [34, 34],
     iconAnchor: [17, 34],
     popupAnchor: [0, -32],
