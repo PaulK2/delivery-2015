@@ -7,6 +7,13 @@ import App from './App.jsx'
 import { AuthProvider } from './context/AuthContext.jsx'
 import { ToastProvider } from './context/ToastContext.jsx'
 
+// Register the PWA service worker in production only (spec §87).
+if ('serviceWorker' in navigator && import.meta.env.PROD) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').catch(() => {})
+  })
+}
+
 // HashRouter avoids the GitHub Pages SPA 404 problem (no server rewrite needed).
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>

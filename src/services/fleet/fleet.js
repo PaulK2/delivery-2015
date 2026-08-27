@@ -12,6 +12,17 @@ export async function getCar(carId) {
   return data?.car || null
 }
 
+// Admin list including inactive vehicles (spec §72).
+export async function getAllCars() {
+  const data = await api('getCars', { includeInactive: true })
+  return data?.cars || []
+}
+
+// Admin: create or update a vehicle (spec §72).
+export async function saveCar(car) {
+  return api('saveCar', { car })
+}
+
 // Take a vehicle. Backend re-checks availability under a lock and prevents
 // double reservation (spec §30, §31).
 export async function takeCar(carId) {

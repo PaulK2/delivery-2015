@@ -9,7 +9,7 @@ import VehiclesPage from './pages/VehiclesPage.jsx'
 import VehicleDetailPage from './pages/VehicleDetailPage.jsx'
 import AvailabilityPage from './pages/AvailabilityPage.jsx'
 import MaintenancePage from './pages/MaintenancePage.jsx'
-import PlaceholderPage from './pages/PlaceholderPage.jsx'
+import AdminPage from './pages/AdminPage.jsx'
 
 function RequireAuth({ children }) {
   const { isAuthenticated, loading } = useAuth()
@@ -47,10 +47,7 @@ export default function App() {
         <Route path="/vehicles" element={<VehiclesPage />} />
         <Route path="/vehicles/:carId" element={<VehicleDetailPage />} />
         <Route path="/maintenance" element={<MaintenancePage />} />
-        <Route
-          path="/admin"
-          element={<PlaceholderPage title="Администрация" phase="Фаза 6" adminOnly />}
-        />
+        <Route path="/admin" element={<AdminPage />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

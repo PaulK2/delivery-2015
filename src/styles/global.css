@@ -1746,3 +1746,176 @@ textarea.input {
 .deadline__days--danger {
   color: var(--danger);
 }
+
+/* ============================================================
+   Phase 6 — Administration
+   ============================================================ */
+
+.checkbox {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  cursor: pointer;
+  margin-bottom: 6px;
+}
+.checkbox input {
+  width: 18px;
+  height: 18px;
+}
+
+/* Tabs */
+.tabs {
+  display: flex;
+  gap: 4px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 16px;
+  overflow-x: auto;
+}
+.tab {
+  border: none;
+  background: none;
+  padding: 10px 14px;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-2);
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  white-space: nowrap;
+}
+.tab--active {
+  color: var(--accent-dark);
+  border-bottom-color: var(--accent);
+}
+
+.admin-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+.admin-toolbar .input {
+  flex: 1;
+}
+.admin-toolbar__count {
+  flex: 1;
+  color: var(--text-2);
+  font-size: 14px;
+}
+
+.admin-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.admin-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+}
+.admin-row__main {
+  min-width: 0;
+}
+.admin-row__name {
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.admin-row__sub {
+  display: block;
+  font-size: 13px;
+  color: var(--text-2);
+  margin-top: 2px;
+}
+.admin-row__tags {
+  display: inline-flex;
+  gap: 6px;
+  margin-left: 8px;
+}
+.admin-row__actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+.tag {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 999px;
+}
+.tag--accent {
+  background: #fff7ed;
+  color: var(--accent-dark);
+}
+.tag--muted {
+  background: var(--surface-2);
+  color: var(--muted);
+  border: 1px solid var(--border);
+}
+
+/* Dashboard stat tiles */
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+  margin-bottom: 14px;
+}
+.stat {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--muted);
+  border-radius: var(--radius);
+  padding: 12px 14px;
+}
+.stat--ok {
+  border-left-color: var(--ok);
+}
+.stat--accent {
+  border-left-color: var(--accent);
+}
+.stat--danger {
+  border-left-color: var(--danger);
+}
+.stat--warn {
+  border-left-color: var(--warn);
+}
+.stat__value {
+  font-size: 26px;
+  font-weight: 800;
+}
+.stat__label {
+  font-size: 13px;
+  color: var(--text-2);
+}
+.availability-note {
+  background: var(--surface-2);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+  font-size: 14px;
+  color: var(--text-2);
+  margin-bottom: 14px;
+}
+.admin-links {
+  margin-top: 20px;
+  font-size: 13px;
+  color: var(--muted);
+}
+.admin-links a {
+  color: var(--accent-dark);
+}
+
+@media (min-width: 720px) {
+  .stat-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
