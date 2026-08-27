@@ -4,8 +4,12 @@ import { HashRouter } from 'react-router-dom'
 import 'leaflet/dist/leaflet.css'
 import './styles/global.css'
 import App from './App.jsx'
+import { APP_VERSION } from './config/index.js'
 import { AuthProvider } from './context/AuthContext.jsx'
 import { ToastProvider } from './context/ToastContext.jsx'
+
+// Printed at startup so the running frontend build is verifiable from the console.
+console.log('FleetView frontend build:', APP_VERSION)
 
 // Register the PWA service worker in production only (spec §87).
 if ('serviceWorker' in navigator && import.meta.env.PROD) {

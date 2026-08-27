@@ -20,6 +20,10 @@ export function setApiUrl(url) {
   }
 }
 
+// Bump on each deploy so we can confirm which frontend build is actually live (shown
+// on the login screen and logged to the console at startup).
+export const APP_VERSION = 'wa-2026-08-28'
+
 export const CONFIG = {
   appName: 'Delivery 2015',
   organization: 'автопарк',
