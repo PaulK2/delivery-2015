@@ -5,6 +5,7 @@ import { getCars } from '../services/fleet/fleet.js'
 import { weekdayNameByIndex, WEEK_ORDER } from '../utils/datetime.js'
 import { shiftHours, shiftSortRank, formatPayment, SHIFT_LABELS } from '../utils/shifts.js'
 import { normalizePlate, resolveScheduleCar } from '../utils/vehicles.js'
+import { locationOrderRank } from '../config/index.js'
 import { useAuth } from '../context/AuthContext.jsx'
 import Spinner from '../components/Spinner.jsx'
 import ScheduleSourceConfig from '../components/ScheduleSourceConfig.jsx'
@@ -100,7 +101,9 @@ export default function SchedulePage() {
       if (!days.has(wd)) continue
       const locs = days.get(wd)
       const locList = [...locs.keys()]
-        .sort((a, b) => a.localeCompare(b, 'bg'))
+        .sort(
+          (a, b) => locationOrderRank(a) - locationOrderRank(b) || a.localeCompare(b, 'bg')
+        )
         .map((locName) => {
           const list = locs.get(locName).sort(
             (a, b) =>

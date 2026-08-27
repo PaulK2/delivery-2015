@@ -92,6 +92,28 @@ export const MODEL_BY_MAKE = {
   peugeot: '107',
 }
 
+// Canonical display order of the work locations (spec order, not alphabetical).
+// Keys are lower-cased, space-collapsed names; anything not listed sorts after these.
+export const LOCATION_ORDER = [
+  'пирин',
+  'гоце делчев',
+  'черковна',
+  'студентски град',
+  'студентски град 2',
+  'младост',
+]
+
+// Rank a location name against LOCATION_ORDER (case/space-insensitive). Unlisted
+// locations get a rank past the end so they fall to the bottom.
+export function locationOrderRank(name) {
+  const key = String(name || '')
+    .toLowerCase()
+    .replace(/\s+/g, ' ')
+    .trim()
+  const i = LOCATION_ORDER.indexOf(key)
+  return i === -1 ? LOCATION_ORDER.length : i
+}
+
 // Brand palette (spec §68)
 export const COLORS = {
   accent: '#F97316', // orange — primary
