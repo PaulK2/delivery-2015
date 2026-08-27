@@ -1,10 +1,9 @@
 # Auth & Admin Migration — run once
 
-**Only administrators use passwords.** Regular staff keep logging in by just selecting
-their name — no credential. This release replaces the shared `Администратор` account
-with **real named admins**, each of whom sets a personal password on first login. The
-frontend (Cloudflare) rebuilds automatically on push, but the **Apps Script backend
-must be redeployed manually**, and a one-time migration run.
+**Every user has a personal password (min 6 characters), created on first login.** This
+release also replaces the shared `Администратор` account with **real named admins**. The
+frontend (Cloudflare) rebuilds automatically on push, but the **Apps Script backend must
+be redeployed manually**, and a one-time migration run.
 
 ## Steps
 
@@ -17,25 +16,28 @@ must be redeployed manually**, and a one-time migration run.
    - adds the `password_hash` / `password_configured` columns if missing;
    - gives the `admin` role to **ЦЕЦО, СИМО, ПАВЕЛ, В. ПЕТКОВ**, creating **ЦЕЦО**
      and **СИМО** if they don't exist;
-   - makes each admin (without a password yet) create one on next login — regular
-     staff are left untouched;
    - **deactivates + demotes** the generic `Администратор` account.
+   It does NOT wipe passwords: a user with no password (blank flag) is taken through
+   first-login setup automatically; anyone who already set one keeps it.
 5. Check the execution **log** for the "Promoted/Created/Retired" lines.
 
 ## What users see next
 
-- **Regular staff:** pick their name → **Вход**. No password, exactly as before.
-- **Admins:** pick their name → because no password is configured yet, they get the
-  **"Създайте парола"** (create + confirm) screen → they're logged in and that
-  password is saved (as a salted SHA-256 hash) for all future logins.
+- **Every user:** pick their name → because no password is configured yet, they get
+  the **"Създайте парола"** (create + confirm, min 6 chars) screen → they're logged in
+  and that password is saved (as a salted SHA-256 hash) for all future logins.
+- After that: pick name → enter password → **Вход**.
 - Sessions persist on the device via the existing token; the password is only used
-  when an admin authenticates, never stored in the browser.
+  when authenticating, never stored in the browser. A temporary backend hiccup never
+  clears the password or forces setup again.
 
 ## Password reset (admin)
 
-Administration → Служители → **Нулирай парола**. This clears the user's hash, marks
-the account as needing setup, and invalidates their sessions — the user sets a new
-password on next login. Admins never see or set another user's password.
+Administration → **Пароли** (Управление на пароли) shows each user's password status
+(configured / not configured — never the hash) with **Нулирай паролата**. Reset clears
+the user's hash, marks the account as needing setup, and invalidates their sessions — the
+user creates a new password on next login. Enforced admin-only on the backend. Admins
+never see or set another user's password.
 
 ## Notes
 

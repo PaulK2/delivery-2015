@@ -540,7 +540,7 @@ function hashPin(pin) {
 
 // Passwords use the same salted SHA-256 as the legacy PIN hashing (the stored salt is
 // reused), so only a secure hash is ever persisted — never the plain-text password.
-var MIN_PASSWORD_LEN = 4;
+var MIN_PASSWORD_LEN = 6;
 
 function hashPassword(password) {
   return hashPin(password);
@@ -660,16 +660,13 @@ function getEmployeesForLogin() {
 
     .map(function(employee) {
 
-      var isAdmin = String(employee.role) === 'admin';
-
       return {
         employee_id: employee.employee_id,
         name: employee.name,
-        // Only administrators authenticate with a password. Regular staff log in with
-        // just their name. For admins, password_configured=false means the login screen
-        // shows the first-time "create password" flow.
-        requires_password: isAdmin,
-        password_configured: isAdmin && isConfiguredFlag(employee.password_configured)
+        // Every user authenticates with a password. password_configured=false means the
+        // login screen shows the first-time "create password" flow for this account.
+        requires_password: true,
+        password_configured: isConfiguredFlag(employee.password_configured)
       };
     });
 
@@ -704,7 +701,9 @@ function getEmployees(params, ctx) {
         employee_id: employee.employee_id,
         name: employee.name,
         role: employee.role || 'employee',
-        active: normalizeBoolean(employee.active)
+        active: normalizeBoolean(employee.active),
+        // Password status for the admin panel — a boolean only, never the hash.
+        password_configured: isConfiguredFlag(employee.password_configured)
       };
     });
 
@@ -933,47 +932,44 @@ function login(params) {
     return fail('employee_inactive');
   }
 
-  // Only administrators authenticate with a password. Regular staff sign in simply by
-  // selecting their name — no credential required.
-  if (String(employee.role) === 'admin') {
+  // Every user authenticates with a personal password.
+  var configured = isConfiguredFlag(employee.password_configured);
 
-    var configured = isConfiguredFlag(employee.password_configured);
+  if (!configured) {
 
-    if (!configured) {
+    // First login: establish the user's own password now (min length enforced here,
+    // not just on the frontend), then log them in.
+    if (!password || String(password).length < MIN_PASSWORD_LEN) {
+      return fail('weak_password');
+    }
 
-      // First admin login: establish the user's own password now, then log them in.
-      if (!password || String(password).length < MIN_PASSWORD_LEN) {
-        return fail('weak_password');
-      }
+    var sheet = getTab(TABS.EMPLOYEES);
 
-      var sheet = getTab(TABS.EMPLOYEES);
+    setRowCells(sheet, employee.__row, {
+      password_hash: hashPassword(String(password)),
+      password_configured: true
+    });
 
-      setRowCells(sheet, employee.__row, {
-        password_hash: hashPassword(String(password)),
-        password_configured: true
-      });
+    audit(
+      publicUser(employee),
+      'password_created',
+      'employee',
+      employee.employee_id,
+      ''
+    );
 
-      audit(
-        publicUser(employee),
-        'password_created',
-        'employee',
-        employee.employee_id,
-        ''
-      );
+  } else {
 
-    } else {
+    // Normal login: verify the previously set password.
+    if (!password) {
+      return fail('validation');
+    }
 
-      // Normal admin login: verify the previously set password.
-      if (!password) {
-        return fail('validation');
-      }
-
-      if (
-        hashPassword(String(password)) !==
-        String(employee.password_hash)
-      ) {
-        return fail('invalid_credentials');
-      }
+    if (
+      hashPassword(String(password)) !==
+      String(employee.password_hash)
+    ) {
+      return fail('invalid_credentials');
     }
   }
 
@@ -3616,12 +3612,12 @@ function nameKeyBG(value) {
  *   1. adds the password_hash / password_configured columns if missing;
  *   2. promotes the named real users to the 'admin' role, creating ЦЕЦО / СИМО if
  *      they don't exist yet;
- *   3. makes each admin set a password on their next login (only if they don't
- *      already have one) — regular staff keep logging in with just their name;
- *   4. deactivates and demotes the generic shared 'Администратор' account.
+ *   3. deactivates and demotes the generic shared 'Администратор' account.
  *
- * Only ADMINISTRATORS use passwords. Regular employees are not touched and log in
- * freely by selecting their name. Existing employee rows (and their IDs, referenced by
+ * EVERY user authenticates with a personal password (min 6 chars), created on first
+ * login. This migration does NOT wipe passwords: a user with no configured password
+ * (blank flag) is naturally taken through first-login setup; users who already set one
+ * keep it until an admin resets it. Existing employee rows (and their IDs, referenced by
  * usage/maintenance/availability/audit history) are updated in place — never recreated.
  */
 function migrateAdminsAndAuth() {
@@ -3661,18 +3657,7 @@ function migrateAdminsAndAuth() {
     }
   });
 
-  // 3) Every admin who hasn't set a password yet must create one on next login.
-  //    (Idempotent: an admin who already configured a password is left alone.)
-  readObjects(TABS.EMPLOYEES).forEach(function(e) {
-    if (String(e.role) === 'admin' && !isConfiguredFlag(e.password_configured)) {
-      setRowCells(sheet, e.__row, {
-        password_hash: '',
-        password_configured: false
-      });
-    }
-  });
-
-  // 4) Retire the generic shared account (deactivate + demote — keeps its id/history
+  // 3) Retire the generic shared account (deactivate + demote — keeps its id/history
   //    intact but removes it from login and strips admin rights).
   readObjects(TABS.EMPLOYEES).forEach(function(e) {
     if (nameKeyBG(e.name) === nameKeyBG(LEGACY_ADMIN_NAME)) {

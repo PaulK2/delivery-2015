@@ -46,9 +46,8 @@ export default function EmployeeModal({ employee, onClose, onSubmit, submitting 
         </select>
       </label>
       <p className="field__hint">
-        {role === 'admin'
-          ? 'Администраторът създава своя парола при първото си влизане.'
-          : 'Служителите влизат само с името си — без парола.'}
+        Потребителят създава своя парола при първото си влизане (минимум 6 символа).
+        Паролата се управлява в раздел „Пароли“.
       </p>
       <label className="checkbox">
         <input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} />

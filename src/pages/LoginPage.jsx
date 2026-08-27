@@ -18,7 +18,7 @@ export default function LoginPage() {
   const [submitting, setSubmitting] = useState(false)
   const [loadError, setLoadError] = useState('')
 
-  const MIN_PASSWORD_LEN = 4
+  const MIN_PASSWORD_LEN = 6
 
   useEffect(() => {
     let alive = true
@@ -114,7 +114,7 @@ export default function LoginPage() {
               <>
                 {firstTime ? (
                   <p className="login-card__hint">
-                    Първо влизане на администратор: създайте своя парола.
+                    Първо влизане: създайте своя парола (минимум 6 символа).
                   </p>
                 ) : null}
 

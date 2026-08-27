@@ -2285,6 +2285,10 @@ textarea.input {
   color: var(--muted);
   border: 1px solid var(--border-subtle);
 }
+.tag--ok {
+  background: var(--success-bg);
+  color: var(--success-text);
+}
 
 /* Dashboard stat tiles */
 .stat-grid {

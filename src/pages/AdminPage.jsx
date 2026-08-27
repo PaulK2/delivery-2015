@@ -5,10 +5,12 @@ import AdminDashboard from '../components/admin/AdminDashboard.jsx'
 import AdminEmployees from '../components/admin/AdminEmployees.jsx'
 import AdminVehicles from '../components/admin/AdminVehicles.jsx'
 import AdminLocations from '../components/admin/AdminLocations.jsx'
+import AdminPasswords from '../components/admin/AdminPasswords.jsx'
 
 const TABS = [
   { key: 'dashboard', label: 'Табло', C: AdminDashboard },
   { key: 'employees', label: 'Служители', C: AdminEmployees },
+  { key: 'passwords', label: 'Пароли', C: AdminPasswords },
   { key: 'vehicles', label: 'Автомобили', C: AdminVehicles },
   { key: 'locations', label: 'Локации', C: AdminLocations },
 ]

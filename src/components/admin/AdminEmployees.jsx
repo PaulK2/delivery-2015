@@ -1,10 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import {
-  getEmployees,
-  saveEmployee,
-  resetEmployeePassword,
-  deleteEmployee,
-} from '../../services/employees/employees.js'
+import { getEmployees, saveEmployee, deleteEmployee } from '../../services/employees/employees.js'
 import { useToast } from '../../context/ToastContext.jsx'
 import { useAuth } from '../../context/AuthContext.jsx'
 import Spinner from '../Spinner.jsx'
@@ -18,7 +13,6 @@ export default function AdminEmployees() {
   const [error, setError] = useState('')
   const [q, setQ] = useState('')
   const [editing, setEditing] = useState(undefined) // undefined=closed, null=new, obj=edit
-  const [resetting, setResetting] = useState(null)
   const [deleting, setDeleting] = useState(null) // employee pending deletion, or null
   const [busy, setBusy] = useState(false)
 
@@ -99,9 +93,6 @@ export default function AdminEmployees() {
               <button className="btn btn--ghost btn--sm" onClick={() => setEditing(e)}>
                 Редактирай
               </button>
-              <button className="btn btn--ghost btn--sm" onClick={() => setResetting(e)}>
-                Нулирай парола
-              </button>
               {e.employee_id !== user?.employee_id ? (
                 <button className="btn btn--danger-ghost btn--sm" onClick={() => setDeleting(e)}>
                   Изтрий
@@ -118,30 +109,6 @@ export default function AdminEmployees() {
           onClose={() => setEditing(undefined)}
           onSubmit={onSave}
           submitting={busy}
-        />
-      ) : null}
-
-      {resetting ? (
-        <ConfirmModal
-          title={`Нулиране на парола — ${resetting.name}`}
-          message={`Паролата на ${resetting.name} ще бъде премахната и потребителят ще създаде нова при следващото си влизане. Активните му сесии ще бъдат прекратени. Продължавате ли?`}
-          confirmLabel="Нулирай парола"
-          busyLabel="Нулиране…"
-          danger={false}
-          onConfirm={async () => {
-            setBusy(true)
-            try {
-              await resetEmployeePassword(resetting.employee_id)
-              setResetting(null)
-              showToast('Паролата е нулирана. Потребителят ще създаде нова при следващо влизане.', 'success')
-            } catch (e) {
-              showToast(e.message || 'Възникна проблем.', 'error')
-            } finally {
-              setBusy(false)
-            }
-          }}
-          onClose={() => setResetting(null)}
-          busy={busy}
         />
       ) : null}
 
