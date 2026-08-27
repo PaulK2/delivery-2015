@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { getCars } from '../services/fleet/fleet.js'
 import { CONFIG } from '../config/index.js'
 import { carTitle } from '../utils/vehicles.js'
@@ -12,15 +12,19 @@ export default function VehiclesPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [q, setQ] = useState('')
+  const inFlight = useRef(false)
 
   async function load(showSpinner = true) {
+    if (inFlight.current) return // don't overlap with an in-progress refresh
+    inFlight.current = true
     if (showSpinner) setLoading(true)
-    setError('')
     try {
       setCars(await getCars())
+      setError('')
     } catch (e) {
       setError(e.message || 'Автомобилите не могат да бъдат заредени.')
     } finally {
+      inFlight.current = false
       setLoading(false)
     }
   }

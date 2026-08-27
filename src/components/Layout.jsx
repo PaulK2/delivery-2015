@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext.jsx'
 import { CONFIG } from '../config/index.js'
@@ -6,6 +6,7 @@ import { getLocations, getSchedule } from '../services/schedule/schedule.js'
 import { todayISO, weekdayIndex, weekdayBG, formatDateBG } from '../utils/datetime.js'
 import { NAV_ITEMS } from './nav.js'
 import OfflineBanner from './OfflineBanner.jsx'
+import ConnectionBanner from './ConnectionBanner.jsx'
 import GlobalSearch from './GlobalSearch.jsx'
 import Icon from './Icon.jsx'
 
@@ -29,17 +30,27 @@ export default function Layout() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
+  // Guard so scheduled/focus refreshes can't overlap: if a load is still in flight,
+  // a new background trigger is skipped instead of firing a duplicate request.
+  const inFlight = useRef(false)
+
   const reload = useCallback(async (showSpinner = false) => {
+    if (inFlight.current) return
+    inFlight.current = true
     if (showSpinner) setLoading(true)
-    const [locRes, schRes] = await Promise.allSettled([getLocations(), getSchedule()])
-    if (locRes.status === 'fulfilled') setLocations(locRes.value)
-    if (schRes.status === 'fulfilled') {
-      setSchedule(schRes.value)
-      setError('')
-    } else {
-      setError(schRes.reason?.message || 'Данните не могат да бъдат заредени.')
+    try {
+      const [locRes, schRes] = await Promise.allSettled([getLocations(), getSchedule()])
+      if (locRes.status === 'fulfilled') setLocations(locRes.value)
+      if (schRes.status === 'fulfilled') {
+        setSchedule(schRes.value)
+        setError('')
+      } else {
+        setError(schRes.reason?.message || 'Данните не могат да бъдат заредени.')
+      }
+    } finally {
+      inFlight.current = false
+      setLoading(false)
     }
-    setLoading(false)
   }, [])
 
   useEffect(() => {
@@ -109,6 +120,7 @@ export default function Layout() {
       </header>
 
       <OfflineBanner />
+      <ConnectionBanner />
 
       <div className="app-body">
         {/* Desktop side navigation */}

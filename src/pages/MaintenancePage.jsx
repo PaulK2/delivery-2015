@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { getMaintenance, resolveIssue } from '../services/maintenance/maintenance.js'
 import { useAuth } from '../context/AuthContext.jsx'
@@ -26,15 +26,19 @@ export default function MaintenancePage() {
   const [resolving, setResolving] = useState(null)
   const [acting, setActing] = useState(false)
   const [filters, setFilters] = useState({ status: 'open', severity: '', category: '', vehicle: '' })
+  const inFlight = useRef(false)
 
   async function load(showSpinner = true) {
+    if (inFlight.current) return // don't overlap with an in-progress refresh
+    inFlight.current = true
     if (showSpinner) setLoading(true)
-    setError('')
     try {
       setItems(await getMaintenance({}))
+      setError('')
     } catch (e) {
       setError(e.message || 'Сигналите не могат да бъдат заредени.')
     } finally {
+      inFlight.current = false
       setLoading(false)
     }
   }

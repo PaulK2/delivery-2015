@@ -403,6 +403,47 @@ button {
   padding: 8px 12px;
 }
 
+/* Non-blocking connection banner (transient backend/network hiccups). It sits under
+   the header and never replaces the app; it disappears automatically on recovery. */
+.connection-banner {
+  color: #fff;
+  font-size: 13px;
+  text-align: center;
+  padding: 8px 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+.connection-banner--unstable {
+  background: var(--warn);
+}
+.connection-banner--lost {
+  background: var(--danger);
+}
+.connection-banner__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0.9;
+  animation: connection-pulse 1s ease-in-out infinite;
+}
+@keyframes connection-pulse {
+  0%,
+  100% {
+    opacity: 0.25;
+  }
+  50% {
+    opacity: 0.9;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .connection-banner__dot {
+    animation: none;
+  }
+}
+
 /* ---------- Page ---------- */
 .page {
   max-width: 960px;

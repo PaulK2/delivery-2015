@@ -55,6 +55,18 @@ export const CONFIG = {
   // Operational data auto-refresh interval in ms (spec §80)
   autoRefreshMs: 45000,
 
+  // Connection reliability (transient Apps Script/network hiccups shouldn't look
+  // like a full outage). A request is aborted after `requestTimeoutMs`; idempotent
+  // reads are retried with the `retryBackoffMs` delays before the call is treated
+  // as failed. The soft "retrying" banner shows after the first failed cycle; the
+  // stronger "no connection" banner only after `strongFailureThreshold` consecutive
+  // failed cycles.
+  net: {
+    requestTimeoutMs: 20000,
+    retryBackoffMs: [1000, 2500], // first retry ~1s, second ~2.5s
+    strongFailureThreshold: 3,
+  },
+
   // Special built-in "own car". Always available, no take/park, no maintenance or
   // documents. Whoever drives it earns a flat bonus on top of the shift payment.
   ownCar: {

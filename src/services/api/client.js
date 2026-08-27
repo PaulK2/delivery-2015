@@ -4,8 +4,14 @@
 //
 // We send Content-Type: text/plain so the browser treats it as a "simple request"
 // and skips the CORS preflight — Apps Script Web Apps do not answer OPTIONS.
+//
+// Reliability (spec §79): Apps Script/network hiccups are common and brief. Idempotent
+// reads are retried automatically with a short backoff, every request has a timeout so
+// it can't hang forever, and transient failures update a shared connection signal so the
+// UI can show a small "retrying" banner instead of looking fully disconnected.
 
-import { API_URL } from '../../config/index.js'
+import { API_URL, CONFIG } from '../../config/index.js'
+import { reportSuccess, reportFailure } from './connection.js'
 
 const TOKEN_KEY = 'fv_session_token'
 
@@ -27,20 +33,92 @@ export function setToken(token) {
 }
 
 // Friendly, user-facing error (Bulgarian) — never leak raw backend errors (spec §16, §78).
+// `transient` marks connectivity problems (worth retrying / a soft banner) as opposed to
+// definitive business errors (unauthorized, validation, …) that must surface immediately.
 export class ApiError extends Error {
-  constructor(messageBG, code) {
+  constructor(messageBG, code, { transient = false } = {}) {
     super(messageBG)
     this.name = 'ApiError'
     this.code = code || 'unknown'
+    this.transient = transient
   }
 }
 
+// Codes that represent a temporary transport/backend hiccup rather than a decision the
+// backend made about the request.
+const TRANSIENT_CODES = new Set(['network', 'timeout', 'bad_response', 'server_error'])
+
+// Only read-only actions are safe to retry automatically — retrying a mutation could
+// double-apply it (take a car twice, save two copies, …). Everything else runs once.
+function isIdempotent(action) {
+  return /^get/i.test(action) || action === 'validateSession'
+}
+
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
+
 export async function api(action, params = {}, { signal } = {}) {
   if (!API_URL) {
+    // Configuration problem, not connectivity — don't touch the connection signal.
     throw new ApiError('Сървърът не е конфигуриран. Свържете се с администратор.', 'no_api_url')
   }
 
+  const backoff = CONFIG.net.retryBackoffMs || []
+  const maxRetries = isIdempotent(action) ? backoff.length : 0
+
+  let lastError
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      const data = await attemptRequest(action, params, signal)
+      reportSuccess()
+      return data
+    } catch (e) {
+      // The caller aborted (component unmounted, navigation) — not a failure.
+      if (e?.name === 'AbortError') throw e
+      lastError = e
+
+      if (e instanceof ApiError && e.transient && attempt < maxRetries) {
+        const delay = backoff[attempt] ?? backoff[backoff.length - 1] ?? 1000
+        // eslint-disable-next-line no-console
+        console.warn(
+          `[api] "${action}" transient failure (${e.code}); retrying in ${delay}ms ` +
+            `(attempt ${attempt + 1}/${maxRetries})`
+        )
+        await sleep(delay)
+        continue
+      }
+      break
+    }
+  }
+
+  // Out of retries (or not retryable). Update the connection signal only for transient
+  // failures so business errors don't make the app look disconnected.
+  if (lastError instanceof ApiError && lastError.transient) {
+    // eslint-disable-next-line no-console
+    console.warn(`[api] "${action}" failed after retries:`, lastError.code, lastError.message)
+    reportFailure()
+  } else {
+    // A definitive answer from the backend means connectivity itself is fine.
+    reportSuccess()
+  }
+  throw lastError
+}
+
+// A single request attempt: applies the timeout, parses the response, and normalizes
+// errors into ApiError with a `transient` flag.
+async function attemptRequest(action, params, externalSignal) {
   const body = JSON.stringify({ action, token: getToken(), params })
+
+  const controller = new AbortController()
+  let timedOut = false
+  const onExternalAbort = () => controller.abort()
+  if (externalSignal) {
+    if (externalSignal.aborted) controller.abort()
+    else externalSignal.addEventListener('abort', onExternalAbort, { once: true })
+  }
+  const timer = setTimeout(() => {
+    timedOut = true
+    controller.abort()
+  }, CONFIG.net.requestTimeoutMs)
 
   let res
   try {
@@ -48,24 +126,35 @@ export async function api(action, params = {}, { signal } = {}) {
       method: 'POST',
       headers: { 'Content-Type': 'text/plain;charset=utf-8' },
       body,
-      signal,
+      signal: controller.signal,
       redirect: 'follow',
     })
   } catch (e) {
-    if (e.name === 'AbortError') throw e
-    throw new ApiError('Няма връзка със сървъра.', 'network')
+    if (timedOut) {
+      throw new ApiError('Сървърът не отговори навреме. Опитваме отново…', 'timeout', {
+        transient: true,
+      })
+    }
+    // Genuine external abort — propagate so the caller can ignore it.
+    if (e?.name === 'AbortError') throw e
+    throw new ApiError('Няма връзка със сървъра.', 'network', { transient: true })
+  } finally {
+    clearTimeout(timer)
+    if (externalSignal) externalSignal.removeEventListener('abort', onExternalAbort)
   }
 
   let payload
   try {
     payload = await res.json()
   } catch {
-    throw new ApiError('Възникна проблем при връзката със сървъра. Опитайте отново.', 'bad_response')
+    throw new ApiError('Възникна проблем при връзката със сървъра. Опитайте отново.', 'bad_response', {
+      transient: true,
+    })
   }
 
   if (!payload || payload.ok !== true) {
     const code = payload?.error || 'server_error'
-    throw new ApiError(mapErrorBG(code), code)
+    throw new ApiError(mapErrorBG(code), code, { transient: TRANSIENT_CODES.has(code) })
   }
 
   return payload.data
