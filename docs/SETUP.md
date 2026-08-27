@@ -61,6 +61,18 @@ Open the printed localhost URL and log in (employee + PIN).
 Put a `CNAME` file with your domain in `public/` and set it under
 **Settings → Pages → Custom domain**.
 
+## 4. Deploy the frontend to Cloudflare (static assets)
+
+The Cloudflare deployment serves the Vite build as static assets — there is no
+Worker API layer. It rebuilds from `main` on every push. Because `.env.local` is
+git-ignored, the committed **`.env.production`** file supplies `VITE_API_URL` at
+build time so the production bundle talks to the same Apps Script `/exec` backend
+as local dev. Update the URL there if the Apps Script deployment ID changes.
+
+> Prefer a Cloudflare **build-time environment variable** (`VITE_API_URL`) in the
+> dashboard when available — it takes precedence over `.env.production`, which is
+> the fallback. The `/exec` URL is not a secret; auth stays inside Apps Script.
+
 ## Notes
 - Secrets (`PIN_SALT`, PIN hashes) live only in Apps Script Script Properties —
   never in the browser or the repo. The `/exec` URL itself is not a secret.
