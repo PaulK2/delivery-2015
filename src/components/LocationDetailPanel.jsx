@@ -6,6 +6,11 @@ import {
   isOwnCarAssignment,
   SHIFT_BADGES,
 } from '../utils/shifts.js'
+import { resolveScheduleCar } from '../utils/vehicles.js'
+
+// Show only the registration plate from a free-text schedule car note (same rule as the
+// График page) — never the raw note or any surrounding words. Empty when there's no plate.
+const carPlate = (raw) => resolveScheduleCar(raw, [])?.plate || ''
 
 // Location details panel (spec §8). Employees sorted full-day before evening.
 export default function LocationDetailPanel({ location, entries, date, onClose }) {
@@ -60,11 +65,8 @@ export default function LocationDetailPanel({ location, entries, date, onClose }
                     {' '}· {paymentWithOwnCarBonus(e.payment, e.car)}
                   </span>
                 ) : null}
-                {e.car ? (
-                  <span className="employee-row__car">
-                    {' '}· {isOwnCarAssignment(e.car) ? '🔑 ' : ''}
-                    {e.car}
-                  </span>
+                {carPlate(e.car) ? (
+                  <span className="employee-row__car"> · {carPlate(e.car)}</span>
                 ) : null}
               </span>
             </li>
