@@ -16,3 +16,8 @@ export async function saveEmployee(employee) {
 export async function resetEmployeePin(employeeId, pin) {
   return api('resetEmployeePin', { employeeId, pin })
 }
+
+// Admin: permanently delete an employee.
+export async function deleteEmployee(employeeId) {
+  return api('deleteEmployee', { employeeId })
+}

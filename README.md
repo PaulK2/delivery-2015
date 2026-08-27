@@ -35,14 +35,19 @@ script locking.
   vignette, road tax, casco, …) with 🟢/🟡/🔴 valid/expiring/expired status per
   configurable warning threshold; admin add/edit per vehicle; admin "Предстоящи
   срокове" widget on Home sorted by nearest expiry
+- Administration + PWA + search (Phase 6): admin-only `/admin` with tabbed dashboard
+  (fleet/issues/documents/availability counters) and CRUD for employees (add/edit,
+  role, active, initial + reset PIN), vehicles (add/edit incl. inactive), and work
+  locations; app-wide quick search (header 🔍 or the `/` key) that jumps to a vehicle
+  by plate/make/model; installable PWA — web manifest, icon, `theme-color`, and a
+  stale-while-revalidate service worker for the app shell (registered in production)
 
 > Phase 3 added two backend actions (`getAvailabilityStatus`, `setAvailabilityWeek`)
 > and a date normalizer in `Backend.gs` — **redeploy the Apps Script** for accurate
 > open/close state, week selection, and duplicate-free re-saves. The frontend degrades
 > gracefully until then (normalizes dates client-side; assumes the period is open).
 
-Frontend still to build against the existing backend: Administration screens +
-PWA/search/polish (Phase 6).
+All frontend phases (1–6) are now wired end-to-end against the existing backend.
 
 ## Getting started
 
@@ -62,8 +67,8 @@ src/
   config/           app configuration (shift times, map, thresholds)
   services/         api client, auth, schedule (+ isolated parser)
   context/          React auth context
-  components/       layout, nav, map, panels, shared UI
-  pages/            Home, Schedule, Login, placeholders
+  components/       layout, nav, map, panels, admin/, global search, shared UI
+  pages/            Home, Schedule, Availability, Vehicles, Maintenance, Admin, Login
   utils/            Bulgarian date/time, shift helpers
   styles/           design system (global.css)
 docs/               setup + sheet schema

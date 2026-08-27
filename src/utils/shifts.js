@@ -38,6 +38,23 @@ export function formatMoney(value) {
 // Shift payment (СМЯНА) display — same formatting as any money value.
 export const formatPayment = formatMoney
 
+// Does a schedule row's assigned car (КОЛИ) refer to the built-in own car?
+export function isOwnCarAssignment(car) {
+  return String(car || '').trim().toLowerCase().includes('собствен')
+}
+
+// Format a shift payment, adding the own-car bonus when that car is assigned
+// (e.g. 45 → 50, 24 → 29). Non-numeric payments pass through unchanged.
+export function paymentWithOwnCarBonus(payment, car) {
+  const s = String(payment == null ? '' : payment).trim()
+  if (isOwnCarAssignment(car) && /^\d+([.,]\d+)?$/.test(s)) {
+    const n = parseFloat(s.replace(',', '.')) + CONFIG.ownCar.payBonus
+    const num = Number.isInteger(n) ? String(n) : String(n).replace('.', ',')
+    return `${num} ${CONFIG.currencySymbol}`
+  }
+  return formatPayment(payment)
+}
+
 // Sort order for a location panel: full-day shifts before evening (spec §8).
 export function shiftSortRank(type) {
   if (type === 'full') return 0

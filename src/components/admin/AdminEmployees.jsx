@@ -1,17 +1,26 @@
 import { useEffect, useMemo, useState } from 'react'
-import { getEmployees, saveEmployee, resetEmployeePin } from '../../services/employees/employees.js'
+import {
+  getEmployees,
+  saveEmployee,
+  resetEmployeePin,
+  deleteEmployee,
+} from '../../services/employees/employees.js'
 import { useToast } from '../../context/ToastContext.jsx'
+import { useAuth } from '../../context/AuthContext.jsx'
 import Spinner from '../Spinner.jsx'
 import Modal from '../Modal.jsx'
 import EmployeeModal from './EmployeeModal.jsx'
+import ConfirmModal from '../ConfirmModal.jsx'
 
 export default function AdminEmployees() {
   const { showToast } = useToast()
+  const { user } = useAuth()
   const [list, setList] = useState(null)
   const [error, setError] = useState('')
   const [q, setQ] = useState('')
   const [editing, setEditing] = useState(undefined) // undefined=closed, null=new, obj=edit
   const [resetting, setResetting] = useState(null)
+  const [deleting, setDeleting] = useState(null) // employee pending deletion, or null
   const [busy, setBusy] = useState(false)
 
   async function load() {
@@ -38,6 +47,20 @@ export default function AdminEmployees() {
       await saveEmployee(emp)
       setEditing(undefined)
       showToast('Служителят е записан.', 'success')
+      await load()
+    } catch (e) {
+      showToast(e.message || 'Възникна проблем.', 'error')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function onDelete() {
+    setBusy(true)
+    try {
+      await deleteEmployee(deleting.employee_id)
+      setDeleting(null)
+      showToast('Служителят е изтрит.', 'success')
       await load()
     } catch (e) {
       showToast(e.message || 'Възникна проблем.', 'error')
@@ -80,6 +103,11 @@ export default function AdminEmployees() {
               <button className="btn btn--ghost btn--sm" onClick={() => setResetting(e)}>
                 PIN
               </button>
+              {e.employee_id !== user?.employee_id ? (
+                <button className="btn btn--danger-ghost btn--sm" onClick={() => setDeleting(e)}>
+                  Изтрий
+                </button>
+              ) : null}
             </div>
           </li>
         ))}
@@ -102,6 +130,16 @@ export default function AdminEmployees() {
             setResetting(null)
             showToast('PIN е нулиран.', 'success')
           }}
+        />
+      ) : null}
+
+      {deleting ? (
+        <ConfirmModal
+          title="Изтриване на служител"
+          message={`Сигурни ли сте, че искате да изтриете ${deleting.name}? Действието е необратимо.`}
+          onConfirm={onDelete}
+          onClose={() => setDeleting(null)}
+          busy={busy}
         />
       ) : null}
     </div>

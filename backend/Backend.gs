@@ -35,6 +35,10 @@
 var TIMEZONE = 'Europe/Sofia';
 var SESSION_TTL_DAYS = 30;
 
+// Distance driven since the last oil change after which the car is flagged (soft,
+// non-blocking) as needing an oil change.
+var OIL_CHANGE_INTERVAL_KM = 10000;
+
 /**
  * IMPORTANT:
  * Put the URL of your CLONED schedule here for testing.
@@ -115,7 +119,10 @@ var DEFAULT_HEADERS = {
     'current_usage_id',
     'parked_location',
     'notes',
-    'active'
+    'active',
+    'last_odometer',
+    'last_oil_change_odometer',
+    'last_oil_change_date'
   ],
 
   UsageHistory: [
@@ -224,6 +231,28 @@ function getTab(name) {
   }
 
   return sheet;
+}
+
+
+// Return the 1-based index of a header column, creating it if it does not exist yet.
+// Lets us add columns (e.g. odometer fields) to an already-deployed sheet on the fly.
+function ensureColumn(sheet, headerName) {
+
+  var lastCol = sheet.getLastColumn();
+
+  var headers = sheet
+    .getRange(1, 1, 1, lastCol)
+    .getValues()[0]
+    .map(function(h) { return String(h).trim(); });
+
+  var idx = headers.indexOf(headerName);
+
+  if (idx >= 0) {
+    return idx + 1;
+  }
+
+  sheet.getRange(1, lastCol + 1).setValue(headerName);
+  return lastCol + 1;
 }
 
 
@@ -576,7 +605,9 @@ function getEmployeesForLogin() {
 
       return {
         employee_id: employee.employee_id,
-        name: employee.name
+        name: employee.name,
+        // The login screen only asks admins for a PIN (simplified staff login).
+        requires_pin: String(employee.role) === 'admin'
       };
     });
 
@@ -714,6 +745,49 @@ function saveEmployee(params, ctx) {
 }
 
 
+function deleteEmployee(params, ctx) {
+
+  var notAdmin = requireAdmin(ctx);
+
+  if (notAdmin) {
+    return notAdmin;
+  }
+
+  var employeeId =
+    params.employeeId ||
+    (params.employee && params.employee.employee_id);
+
+  if (!employeeId) {
+    return fail('validation');
+  }
+
+  // An admin cannot delete their own account.
+  if (String(employeeId) === String(ctx.user.employee_id)) {
+    return fail('cannot_delete_self');
+  }
+
+  var employee = findEmployee(employeeId);
+
+  if (!employee) {
+    return fail('not_found');
+  }
+
+  getTab(TABS.EMPLOYEES).deleteRow(employee.__row);
+
+  audit(
+    ctx.user,
+    'employee_deleted',
+    'employee',
+    employeeId,
+    employee.name
+  );
+
+  return ok({
+    employee_id: employeeId
+  });
+}
+
+
 function resetEmployeePin(params, ctx) {
 
   var notAdmin = requireAdmin(ctx);
@@ -769,10 +843,7 @@ function login(params) {
   var pin =
     params.pin;
 
-  if (
-    !employeeId ||
-    !pin
-  ) {
+  if (!employeeId) {
     return fail('validation');
   }
 
@@ -787,11 +858,20 @@ function login(params) {
     return fail('employee_inactive');
   }
 
-  if (
-    hashPin(pin) !==
-    String(employee.pin_hash)
-  ) {
-    return fail('invalid_pin');
+  // Only administrators authenticate with a PIN; ordinary staff sign in simply by
+  // selecting their name (simplified staff login).
+  if (String(employee.role) === 'admin') {
+
+    if (!pin) {
+      return fail('validation');
+    }
+
+    if (
+      hashPin(pin) !==
+      String(employee.pin_hash)
+    ) {
+      return fail('invalid_pin');
+    }
   }
 
   var token =
@@ -1757,8 +1837,55 @@ function serializeCar(car) {
       car.notes || '',
 
     active:
-      normalizeBoolean(car.active)
+      normalizeBoolean(car.active),
+
+    last_odometer:
+      toNumberOrNull(car.last_odometer),
+
+    last_oil_change_odometer:
+      toNumberOrNull(car.last_oil_change_odometer),
+
+    last_oil_change_date:
+      normalizeIsoDate(car.last_oil_change_date),
+
+    km_since_oil_change:
+      kmSinceOilChange(car),
+
+    // Soft, non-blocking flag: 10 000+ km since the last oil change.
+    oil_change_due:
+      isOilChangeDue(car)
   };
+}
+
+
+function toNumberOrNull(value) {
+
+  if (value === '' || value == null) {
+    return null;
+  }
+
+  var n = Number(value);
+  return isNaN(n) ? null : n;
+}
+
+
+function kmSinceOilChange(car) {
+
+  var last = toNumberOrNull(car.last_odometer);
+  var oil = toNumberOrNull(car.last_oil_change_odometer);
+
+  if (last == null || oil == null) {
+    return null;
+  }
+
+  return last - oil;
+}
+
+
+function isOilChangeDue(car) {
+
+  var km = kmSinceOilChange(car);
+  return km != null && km >= OIL_CHANGE_INTERVAL_KM;
 }
 
 
@@ -1943,6 +2070,49 @@ function saveCar(params, ctx) {
 }
 
 
+function deleteCar(params, ctx) {
+
+  var notAdmin = requireAdmin(ctx);
+
+  if (notAdmin) {
+    return notAdmin;
+  }
+
+  var carId =
+    params.carId ||
+    (params.car && params.car.car_id);
+
+  if (!carId) {
+    return fail('validation');
+  }
+
+  var car = findCar(carId);
+
+  if (!car) {
+    return fail('car_not_found');
+  }
+
+  // A car that is currently taken must be released before it can be removed.
+  if (String(car.status) === 'in_use') {
+    return fail('car_in_use');
+  }
+
+  getTab(TABS.CARS).deleteRow(car.__row);
+
+  audit(
+    ctx.user,
+    'car_deleted',
+    'car',
+    carId,
+    car.registration
+  );
+
+  return ok({
+    car_id: carId
+  });
+}
+
+
 /* ============================================================================
  * TAKE / RELEASE CAR
  * ========================================================================== */
@@ -2071,6 +2241,12 @@ function releaseCar(params, ctx) {
     return fail('validation');
   }
 
+  var odometer = toNumberOrNull(params.odometer);
+
+  if (odometer == null || odometer < 0) {
+    return fail('odometer_required');
+  }
+
   var car =
     findCar(params.carId);
 
@@ -2083,6 +2259,12 @@ function releaseCar(params, ctx) {
     'in_use'
   ) {
     return fail('car_not_in_use');
+  }
+
+  // Odometer only moves forward.
+  var prevOdometer = toNumberOrNull(car.last_odometer);
+  if (prevOdometer != null && odometer < prevOdometer) {
+    return fail('odometer_too_low');
   }
 
 
@@ -2196,12 +2378,19 @@ function releaseCar(params, ctx) {
     ]]);
 
 
+  // Record the odometer reading in its own column (outside the fixed 13-wide write).
+  var carsSheet = getTab(TABS.CARS);
+  carsSheet
+    .getRange(car.__row, ensureColumn(carsSheet, 'last_odometer'))
+    .setValue(odometer);
+
+
   audit(
     ctx.user,
     'car_released',
     'car',
     car.car_id,
-    parkedLocation
+    parkedLocation + ' · ' + odometer + ' км'
   );
 
 
@@ -2215,6 +2404,69 @@ function releaseCar(params, ctx) {
 
     parked_location:
       parkedLocation
+  });
+}
+
+
+// Admin: record an oil change. Stores the odometer at which it was done (defaults to
+// the car's last known reading) and the date (defaults to today), which clears the
+// soft "oil change due" flag until another OIL_CHANGE_INTERVAL_KM is driven.
+function recordOilChange(params, ctx) {
+
+  var notAdmin = requireAdmin(ctx);
+
+  if (notAdmin) {
+    return notAdmin;
+  }
+
+  var car = findCar(params.carId);
+
+  if (!car) {
+    return fail('car_not_found');
+  }
+
+  var odometer = toNumberOrNull(params.odometer);
+
+  if (odometer == null) {
+    odometer = toNumberOrNull(car.last_odometer);
+  }
+
+  if (odometer == null || odometer < 0) {
+    return fail('odometer_required');
+  }
+
+  var date = params.date
+    ? normalizeIsoDate(params.date)
+    : dateOnly(new Date());
+
+  var sheet = getTab(TABS.CARS);
+
+  sheet
+    .getRange(car.__row, ensureColumn(sheet, 'last_oil_change_odometer'))
+    .setValue(odometer);
+
+  sheet
+    .getRange(car.__row, ensureColumn(sheet, 'last_oil_change_date'))
+    .setValue(date);
+
+  // Keep last_odometer consistent (never below the oil-change reading).
+  var last = toNumberOrNull(car.last_odometer);
+  if (last == null || last < odometer) {
+    sheet
+      .getRange(car.__row, ensureColumn(sheet, 'last_odometer'))
+      .setValue(odometer);
+  }
+
+  audit(
+    ctx.user,
+    'oil_change_recorded',
+    'car',
+    car.car_id,
+    odometer + ' км · ' + date
+  );
+
+  return ok({
+    car: serializeCar(findCar(params.carId))
   });
 }
 
@@ -3375,6 +3627,177 @@ function setup() {
 }
 
 
+/**
+ * One-time fleet seed. Run manually from the Apps Script editor (like setup()).
+ *
+ * Adds the 10 real vehicles (matched to the photos in /public/cars, keyed by
+ * registration) if they are not already present. Models follow the agreed
+ * make-normalisation (Citroen -> C1, Peugeot -> 107, etc.); Renaults keep their
+ * real model. Safe to re-run: existing plates are skipped.
+ *
+ * The special "Собствена кола" is NOT seeded here — it is a built-in, app-side
+ * vehicle handled entirely by the frontend (always available, no take/park,
+ * no maintenance/documents, higher pay).
+ */
+function fleetCatalog() {
+
+  // Authoritative make/model for the 10 photographed vehicles, keyed by plate.
+  // Kept in sync with FLEET_CATALOG in src/utils/vehicles.js.
+  return [
+    { registration: 'CB0254CO', make: 'Citroen',    model: 'C1' },
+    { registration: 'CB3989KO', make: 'Citroen',    model: 'C1' },
+    { registration: 'CB8361CH', make: 'Citroen',    model: 'C1' },
+    { registration: 'CB0668CC', make: 'Seat',       model: 'Ibiza' },
+    { registration: 'CB1950TP', make: 'Chevrolet',  model: 'Aveo' },
+    { registration: 'CB2333CP', make: 'Peugeot',    model: '107' },
+    { registration: 'CB3297TA', make: 'Suzuki',     model: 'Swift' },
+    { registration: 'CB0927AA', make: 'Renault',    model: 'Scenic' },
+    { registration: 'CB7052CB', make: 'Renault',    model: 'Clio' },
+    { registration: 'CB7920BC', make: 'Renault',    model: 'Clio' }
+  ];
+}
+
+
+function seedFleetCars() {
+
+  var FLEET = fleetCatalog();
+
+  var sheet = getTab(TABS.CARS);
+
+  var existing = {};
+  readObjects(TABS.CARS).forEach(function(car) {
+    existing[normalizePlate(car.registration)] = true;
+  });
+
+  var added = 0;
+
+  FLEET.forEach(function(item) {
+
+    if (existing[normalizePlate(item.registration)]) {
+      return;
+    }
+
+    sheet.appendRow([
+      genId('CAR'),
+      item.registration,
+      item.make,
+      item.model,
+      '',            // year
+      '',            // image (photos are served by the frontend, keyed by plate)
+      'available',
+      '',            // current_driver_id
+      '',            // current_driver_name
+      '',            // current_usage_id
+      '',            // parked_location
+      '',            // notes
+      true           // active
+    ]);
+
+    added++;
+  });
+
+  Logger.log('seedFleetCars: added ' + added + ' of ' + FLEET.length + ' vehicles.');
+  return added;
+}
+
+
+/**
+ * One-time cleanup: correct the make/model of the photographed vehicles whose Sheet
+ * rows hold placeholder/wrong values (e.g. a plate that pre-existed with a different
+ * make, so seedFleetCars skipped it). Matches by plate and only writes when a value
+ * actually differs. Run manually from the Apps Script editor. Safe to re-run.
+ */
+function fixFleetMakes() {
+
+  var sheet = getTab(TABS.CARS);
+  var rows = readObjects(TABS.CARS);
+
+  var wanted = {};
+  fleetCatalog().forEach(function(item) {
+    wanted[normalizePlate(item.registration)] = item;
+  });
+
+  var fixed = 0;
+
+  rows.forEach(function(car) {
+
+    var item = wanted[normalizePlate(car.registration)];
+    if (!item) {
+      return;
+    }
+
+    if (String(car.make) === item.make && String(car.model) === item.model) {
+      return; // already correct
+    }
+
+    // Columns 3 (make) and 4 (model) in the Cars tab.
+    sheet.getRange(car.__row, 3, 1, 2).setValues([[item.make, item.model]]);
+    fixed++;
+  });
+
+  Logger.log('fixFleetMakes: corrected ' + fixed + ' vehicle(s).');
+  return fixed;
+}
+
+
+function normalizePlate(value) {
+
+  // Bulgarian plates share letters between Cyrillic and Latin, so the same plate can
+  // be typed either way (Cyrillic СВ… vs Latin CB…). Fold the look-alike Cyrillic
+  // letters to their Latin twin so both forms compare equal.
+  var MAP = {
+    'А': 'A', 'В': 'B', 'Е': 'E', 'К': 'K', 'М': 'M', 'Н': 'H',
+    'О': 'O', 'Р': 'P', 'С': 'C', 'Т': 'T', 'У': 'Y', 'Х': 'X'
+  };
+
+  return String(value == null ? '' : value)
+    .replace(/\s+/g, '')
+    .toUpperCase()
+    .replace(/[А-Я]/g, function(ch) {
+      return MAP[ch] || ch;
+    });
+}
+
+
+/**
+ * One-time cleanup: remove duplicate car rows that share a registration plate,
+ * keeping the first occurrence of each. Run manually from the Apps Script editor.
+ * Safe to re-run (a no-op once the fleet is clean).
+ */
+function dedupeFleetCars() {
+
+  var sheet = getTab(TABS.CARS);
+  var rows = readObjects(TABS.CARS);
+
+  var seen = {};
+  var toDelete = [];
+
+  for (var i = 0; i < rows.length; i++) {
+
+    var plate = normalizePlate(rows[i].registration);
+
+    if (!plate) {
+      continue;
+    }
+
+    if (seen[plate]) {
+      toDelete.push(rows[i].__row);
+    } else {
+      seen[plate] = true;
+    }
+  }
+
+  // Delete from the bottom up so earlier row numbers remain valid.
+  toDelete.sort(function(a, b) { return b - a; });
+  toDelete.forEach(function(rowNumber) {
+    sheet.deleteRow(rowNumber);
+  });
+
+  Logger.log('dedupeFleetCars: removed ' + toDelete.length + ' duplicate row(s).');
+  return toDelete.length;
+}
+
+
 /* ============================================================================
  * MANUAL ADMIN HELPERS
  * ========================================================================== */
@@ -3561,6 +3984,11 @@ var ROUTES = {
     lock: true
   },
 
+  deleteEmployee: {
+    fn: deleteEmployee,
+    lock: true
+  },
+
   resetEmployeePin: {
     fn: resetEmployeePin,
     lock: true
@@ -3618,8 +4046,18 @@ var ROUTES = {
     lock: true
   },
 
+  deleteCar: {
+    fn: deleteCar,
+    lock: true
+  },
+
   takeCar: {
     fn: takeCar,
+    lock: true
+  },
+
+  recordOilChange: {
+    fn: recordOilChange,
     lock: true
   },
 

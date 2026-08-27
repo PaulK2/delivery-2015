@@ -1,18 +1,30 @@
 import { useState } from 'react'
 import Modal from './Modal.jsx'
 
-// Release form (spec §32). Parking location is required; note is optional.
-export default function ReleaseCarModal({ onClose, onSubmit, submitting }) {
+// Release form (spec §32). Parking location + current odometer are required; note optional.
+export default function ReleaseCarModal({ onClose, onSubmit, submitting, lastOdometer }) {
   const [parkedLocation, setParkedLocation] = useState('')
+  const [odometer, setOdometer] = useState('')
   const [notes, setNotes] = useState('')
   const [error, setError] = useState('')
+
+  const prev = lastOdometer == null ? null : Number(lastOdometer)
 
   function submit() {
     if (!parkedLocation.trim()) {
       setError('Моля, въведете къде оставихте автомобила.')
       return
     }
-    onSubmit(parkedLocation.trim(), notes.trim())
+    if (!/^\d+$/.test(odometer)) {
+      setError('Въведете текущия километраж (в км).')
+      return
+    }
+    const km = Number(odometer)
+    if (prev != null && km < prev) {
+      setError(`Километражът не може да е под предишния (${prev.toLocaleString('bg-BG')} км).`)
+      return
+    }
+    onSubmit(parkedLocation.trim(), notes.trim(), km)
   }
 
   return (
@@ -39,6 +51,19 @@ export default function ReleaseCarModal({ onClose, onSubmit, submitting }) {
           placeholder="напр. Централен паркинг"
           autoFocus
         />
+      </label>
+      <label className="field">
+        <span className="field__label">Текущ километраж (км)</span>
+        <input
+          className="input"
+          inputMode="numeric"
+          value={odometer}
+          onChange={(e) => setOdometer(e.target.value.replace(/\D/g, ''))}
+          placeholder={prev != null ? `≥ ${prev.toLocaleString('bg-BG')}` : 'напр. 145000'}
+        />
+        {prev != null ? (
+          <span className="field__hint">Последно записан: {prev.toLocaleString('bg-BG')} км</span>
+        ) : null}
       </label>
       <label className="field">
         <span className="field__label">Допълнителна бележка</span>

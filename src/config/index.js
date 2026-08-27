@@ -21,8 +21,8 @@ export function setApiUrl(url) {
 }
 
 export const CONFIG = {
-  appName: 'Автопарк',
-  organization: 'delivery-2015',
+  appName: 'Delivery 2015',
+  organization: 'автопарк',
   timezone: 'Europe/Sofia',
   locale: 'bg-BG',
   currencySymbol: '€',
@@ -32,6 +32,7 @@ export const CONFIG = {
     defaultLat: 42.6977,
     defaultLng: 23.3219,
     defaultZoom: 12,
+    focusZoom: 15, // zoom applied when focusing the user's restaurant for today
     minZoom: 10,
     maxZoom: 19,
     tileUrl: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
@@ -48,8 +49,35 @@ export const CONFIG = {
   // Warning threshold for documents/inspections in days (spec §47)
   documentWarningDays: 30,
 
+  // Distance (km) since the last oil change after which a car is flagged (soft).
+  oilChangeIntervalKm: 10000,
+
   // Operational data auto-refresh interval in ms (spec §80)
   autoRefreshMs: 45000,
+
+  // Special built-in "own car". Always available, no take/park, no maintenance or
+  // documents. Whoever drives it earns a flat bonus on top of the shift payment.
+  ownCar: {
+    id: 'OWN',
+    label: 'Собствена кола',
+    payBonus: 5, // €, e.g. 45 → 50, 24 → 29
+  },
+}
+
+// Canonical model per make (keeps displayed models consistent regardless of what
+// the Google Sheet holds). Keys are lower-cased, accent-insensitive makes. An empty
+// string means "make only, no model" (e.g. Škoda). Makes not listed keep their own
+// model (e.g. Renault → Clio/Scénic).
+export const MODEL_BY_MAKE = {
+  toyota: 'Aygo',
+  citroen: 'C1',
+  suzuki: 'Swift',
+  kia: 'Picanto',
+  seat: 'Ibiza',
+  skoda: '',
+  chevrolet: 'Aveo',
+  opel: 'Astra',
+  peugeot: '107',
 }
 
 // Brand palette (spec §68)

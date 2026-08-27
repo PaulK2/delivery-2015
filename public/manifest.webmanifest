@@ -1,13 +1,13 @@
 {
-  "name": "Автопарк — delivery-2015",
-  "short_name": "Автопарк",
+  "name": "Delivery 2015",
+  "short_name": "Delivery 2015",
   "description": "Вътрешна платформа за управление на автопарк",
   "lang": "bg",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
-  "background_color": "#f4f5f7",
-  "theme_color": "#f97316",
+  "background_color": "#f5f5f3",
+  "theme_color": "#f5f5f3",
   "icons": [
     {
       "src": "/icons/icon.svg",

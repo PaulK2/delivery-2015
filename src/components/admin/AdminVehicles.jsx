@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from 'react'
-import { getAllCars, saveCar } from '../../services/fleet/fleet.js'
+import { getAllCars, saveCar, deleteCar } from '../../services/fleet/fleet.js'
 import { useToast } from '../../context/ToastContext.jsx'
 import { carTitle } from '../../utils/vehicles.js'
 import StatusBadge from '../StatusBadge.jsx'
 import Spinner from '../Spinner.jsx'
 import VehicleModal from './VehicleModal.jsx'
+import ConfirmModal from '../ConfirmModal.jsx'
 
 export default function AdminVehicles() {
   const { showToast } = useToast()
@@ -12,6 +13,7 @@ export default function AdminVehicles() {
   const [error, setError] = useState('')
   const [q, setQ] = useState('')
   const [editing, setEditing] = useState(undefined)
+  const [deleting, setDeleting] = useState(null) // car pending deletion, or null
   const [busy, setBusy] = useState(false)
 
   async function load() {
@@ -42,6 +44,20 @@ export default function AdminVehicles() {
       await saveCar(car)
       setEditing(undefined)
       showToast('Автомобилът е записан.', 'success')
+      await load()
+    } catch (e) {
+      showToast(e.message || 'Възникна проблем.', 'error')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function onDelete() {
+    setBusy(true)
+    try {
+      await deleteCar(deleting.car_id)
+      setDeleting(null)
+      showToast('Автомобилът е изтрит.', 'success')
       await load()
     } catch (e) {
       showToast(e.message || 'Възникна проблем.', 'error')
@@ -82,6 +98,9 @@ export default function AdminVehicles() {
               <button className="btn btn--ghost btn--sm" onClick={() => setEditing(c)}>
                 Редактирай
               </button>
+              <button className="btn btn--danger-ghost btn--sm" onClick={() => setDeleting(c)}>
+                Изтрий
+              </button>
             </div>
           </li>
         ))}
@@ -89,6 +108,16 @@ export default function AdminVehicles() {
 
       {editing !== undefined ? (
         <VehicleModal car={editing} onClose={() => setEditing(undefined)} onSubmit={onSave} submitting={busy} />
+      ) : null}
+
+      {deleting ? (
+        <ConfirmModal
+          title="Изтриване на автомобил"
+          message={`Сигурни ли сте, че искате да изтриете ${deleting.registration}? Действието е необратимо.`}
+          onConfirm={onDelete}
+          onClose={() => setDeleting(null)}
+          busy={busy}
+        />
       ) : null}
     </div>
   )

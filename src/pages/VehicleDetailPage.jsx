@@ -7,16 +7,19 @@ import {
   getCarUsageHistory,
   getCarMaintenance,
   restoreCarToService,
+  recordOilChange,
 } from '../services/fleet/fleet.js'
 import { reportIssue, resolveIssue } from '../services/maintenance/maintenance.js'
 import { getVehicleDocuments, saveVehicleDocument } from '../services/documents/documents.js'
 import { useAuth } from '../context/AuthContext.jsx'
 import { useToast } from '../context/ToastContext.jsx'
-import { carTitle, SEVERITY, severityRank, categoryLabel } from '../utils/vehicles.js'
+import { carTitle, carPhoto, isOwnCar, oilInfo, SEVERITY, severityRank, categoryLabel } from '../utils/vehicles.js'
 import { formatMoney } from '../utils/shifts.js'
-import { formatStampBG } from '../utils/datetime.js'
+import { CONFIG } from '../config/index.js'
+import { formatStampBG, formatDateBG } from '../utils/datetime.js'
 import StatusBadge from '../components/StatusBadge.jsx'
 import ReleaseCarModal from '../components/ReleaseCarModal.jsx'
+import OilChangeModal from '../components/OilChangeModal.jsx'
 import ReportIssueModal from '../components/ReportIssueModal.jsx'
 import ResolveIssueModal from '../components/ResolveIssueModal.jsx'
 import UsageHistoryList from '../components/UsageHistoryList.jsx'
@@ -37,6 +40,7 @@ export default function VehicleDetailPage() {
   const [error, setError] = useState('')
   const [acting, setActing] = useState(false)
   const [showRelease, setShowRelease] = useState(false)
+  const [showOil, setShowOil] = useState(false)
   const [showReport, setShowReport] = useState(false)
   const [resolving, setResolving] = useState(null) // issue being resolved, or null
   const [docModal, setDocModal] = useState(null) // { doc } to edit/add, or null closed
@@ -106,12 +110,26 @@ export default function VehicleDetailPage() {
     }
   }
 
-  async function onRelease(parkedLocation, notes) {
+  async function onRelease(parkedLocation, notes, odometer) {
     setActing(true)
     try {
-      await releaseCar(carId, parkedLocation, notes)
+      await releaseCar(carId, parkedLocation, notes, odometer)
       setShowRelease(false)
       showToast('Автомобилът е освободен.', 'success')
+      await refresh()
+    } catch (e) {
+      showToast(e.message || 'Възникна проблем.', 'error')
+    } finally {
+      setActing(false)
+    }
+  }
+
+  async function onRecordOil(odometer) {
+    setActing(true)
+    try {
+      await recordOilChange(carId, odometer)
+      setShowOil(false)
+      showToast('Смяната на масло е записана.', 'success')
       await refresh()
     } catch (e) {
       showToast(e.message || 'Възникна проблем.', 'error')
@@ -199,9 +217,13 @@ export default function VehicleDetailPage() {
     )
   }
 
+  const own = isOwnCar(car)
+  const photo = carPhoto(car)
+  const oil = oilInfo(car)
+  const fmtKm = (v) => (v == null ? '—' : Number(v).toLocaleString('bg-BG') + ' км')
   const isDriver = car.current_driver_id && car.current_driver_id === user?.employee_id
-  const canTake = car.status === 'available' && car.active
-  const canRelease = car.status === 'in_use' && (isDriver || isAdmin)
+  const canTake = !own && car.status === 'available' && car.active
+  const canRelease = !own && car.status === 'in_use' && (isDriver || isAdmin)
 
   return (
     <div className="page vehicle-detail">
@@ -209,18 +231,19 @@ export default function VehicleDetailPage() {
 
       <div className="vehicle-hero">
         <div className="vehicle-hero__media">
-          {car.image ? (
-            <img src={car.image} alt={carTitle(car)} />
+          {photo ? (
+            <img src={photo} alt={carTitle(car)} />
           ) : (
-            <span className="vehicle-hero__noimg" aria-hidden="true">🚗</span>
+            <span className="vehicle-hero__noimg" aria-hidden="true">{own ? '🔑' : '🚗'}</span>
           )}
         </div>
         <div className="vehicle-hero__info">
           <div className="vehicle-hero__plate">{car.registration}</div>
-          <div className="vehicle-hero__name">{carTitle(car)}</div>
+          <div className="vehicle-hero__name">{own ? 'по-високо заплащане' : carTitle(car)}</div>
           {car.year ? <div className="vehicle-hero__year">{car.year}</div> : null}
           <div className="vehicle-hero__status">
             <StatusBadge status={car.status} />
+            {oil.due ? <span className="oil-badge" title="Нужна е смяна на масло">🛢 Масло</span> : null}
           </div>
           {car.status === 'in_use' && car.current_driver_name ? (
             <div className="vehicle-hero__meta">👤 {car.current_driver_name}</div>
@@ -261,7 +284,18 @@ export default function VehicleDetailPage() {
         </section>
       ) : null}
 
-      {/* Actions */}
+      {/* Own car: always available, no take/park/report — just the pay note */}
+      {own ? (
+        <div className="own-car-note">
+          <div className="own-car-note__title">🔑 {CONFIG.ownCar.label}</div>
+          <p>Винаги свободна. Не се взема, паркира или отчита през приложението.</p>
+          <p className="own-car-note__pay">
+            Шофьорът получава{' '}
+            <strong>+{CONFIG.ownCar.payBonus} {CONFIG.currencySymbol}</strong> към заплащането за смяна
+            {' '}(напр. 45 → {45 + CONFIG.ownCar.payBonus}, 24 → {24 + CONFIG.ownCar.payBonus}).
+          </p>
+        </div>
+      ) : (
       <div className="vehicle-actions">
         {canTake ? (
           <button className="btn btn--primary btn--block" onClick={onTake} disabled={acting}>
@@ -301,16 +335,67 @@ export default function VehicleDetailPage() {
           Докладвай проблем
         </button>
       </div>
+      )}
 
-      {/* Documents & deadlines (spec §46–§50) */}
-      <DocumentsSection
-        documents={documents}
-        isAdmin={isAdmin}
-        onAdd={() => setDocModal({ doc: null })}
-        onEdit={(doc) => setDocModal({ doc })}
-      />
+      {/* Odometer & oil change — not applicable to the own car */}
+      {!own ? (
+        <section className="detail-section">
+          <div className="detail-section__head">
+            <h2 className="detail-section__title">Километраж и масло</h2>
+            {isAdmin ? (
+              <button
+                className="btn btn--ghost btn--sm"
+                onClick={() => setShowOil(true)}
+                disabled={acting}
+              >
+                Отбележи смяна на масло
+              </button>
+            ) : null}
+          </div>
+
+          {oil.due ? (
+            <div className="banner banner--warn" role="status">
+              🛢 Време е за смяна на масло — изминати {fmtKm(oil.km)} от последната смяна
+              (праг {fmtKm(oil.interval)}). Автомобилът може да се използва.
+            </div>
+          ) : null}
+
+          <div className="odo-grid">
+            <div className="odo-cell">
+              <div className="odo-cell__label">Текущ километраж</div>
+              <div className="odo-cell__value">{fmtKm(oil.lastOdo)}</div>
+            </div>
+            <div className="odo-cell">
+              <div className="odo-cell__label">Последна смяна на масло</div>
+              <div className="odo-cell__value">
+                {oil.tracked ? fmtKm(oil.lastOilOdo) : '—'}
+              </div>
+              <div className="odo-cell__sub">
+                {oil.lastOilDate ? formatDateBG(oil.lastOilDate) : 'няма запис'}
+              </div>
+            </div>
+            <div className="odo-cell">
+              <div className="odo-cell__label">До следваща смяна</div>
+              <div className={'odo-cell__value' + (oil.due ? ' odo-cell__value--warn' : '')}>
+                {oil.remaining == null ? '—' : oil.due ? 'просрочена' : fmtKm(oil.remaining)}
+              </div>
+            </div>
+          </div>
+        </section>
+      ) : null}
+
+      {/* Documents & deadlines (spec §46–§50) — not applicable to the own car */}
+      {!own ? (
+        <DocumentsSection
+          documents={documents}
+          isAdmin={isAdmin}
+          onAdd={() => setDocModal({ doc: null })}
+          onEdit={(doc) => setDocModal({ doc })}
+        />
+      ) : null}
 
       {/* Usage history */}
+      {!own ? (
       <section className="detail-section">
         <h2 className="detail-section__title">История на ползване</h2>
         {history === null ? (
@@ -319,8 +404,10 @@ export default function VehicleDetailPage() {
           <UsageHistoryList history={history} />
         )}
       </section>
+      ) : null}
 
       {/* Repair history (spec §44) */}
+      {!own ? (
       <section className="detail-section">
         <h2 className="detail-section__title">История на ремонти</h2>
         {repairs.length === 0 ? (
@@ -350,9 +437,23 @@ export default function VehicleDetailPage() {
           </ul>
         )}
       </section>
+      ) : null}
 
       {showRelease ? (
-        <ReleaseCarModal onClose={() => setShowRelease(false)} onSubmit={onRelease} submitting={acting} />
+        <ReleaseCarModal
+          onClose={() => setShowRelease(false)}
+          onSubmit={onRelease}
+          submitting={acting}
+          lastOdometer={car.last_odometer}
+        />
+      ) : null}
+      {showOil ? (
+        <OilChangeModal
+          onClose={() => setShowOil(false)}
+          onSubmit={onRecordOil}
+          submitting={acting}
+          lastOdometer={car.last_odometer}
+        />
       ) : null}
       {showReport ? (
         <ReportIssueModal onClose={() => setShowReport(false)} onSubmit={onReport} submitting={acting} />

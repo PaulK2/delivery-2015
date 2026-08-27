@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext.jsx'
 import { getEmployeesForLogin } from '../services/auth/auth.js'
 import { CONFIG } from '../config/index.js'
 import Spinner from '../components/Spinner.jsx'
+import Icon from '../components/Icon.jsx'
 
 export default function LoginPage() {
   const { isAuthenticated, login } = useAuth()
@@ -28,15 +29,25 @@ export default function LoginPage() {
 
   if (isAuthenticated) return <Navigate to="/" replace />
 
+  // Only administrators sign in with a PIN; ordinary staff just pick their name.
+  const selected = employees?.find((emp) => emp.employee_id === employeeId)
+  const needsPin = !!selected?.requires_pin
+
+  function onSelectEmployee(id) {
+    setEmployeeId(id)
+    setPin('')
+    setError('')
+  }
+
   async function onSubmit(e) {
     e.preventDefault()
     setError('')
     if (!employeeId) return setError('Изберете служител.')
-    if (!/^\d{4,6}$/.test(pin)) return setError('PIN трябва да е 4–6 цифри.')
+    if (needsPin && !/^\d{4,6}$/.test(pin)) return setError('PIN трябва да е 4–6 цифри.')
 
     setSubmitting(true)
     try {
-      await login(employeeId, pin)
+      await login(employeeId, needsPin ? pin : '')
       navigate('/', { replace: true })
     } catch (err) {
       setError(err.message || 'Входът е неуспешен.')
@@ -50,7 +61,9 @@ export default function LoginPage() {
     <div className="login-screen">
       <div className="login-card">
         <div className="login-card__brand">
-          <span className="login-card__logo">🚚</span>
+          <span className="login-card__logo">
+            <Icon name="truck" size={44} />
+          </span>
           <h1>{CONFIG.appName}</h1>
           <p className="login-card__org">{CONFIG.organization}</p>
         </div>
@@ -68,7 +81,7 @@ export default function LoginPage() {
               <select
                 className="input"
                 value={employeeId}
-                onChange={(e) => setEmployeeId(e.target.value)}
+                onChange={(e) => onSelectEmployee(e.target.value)}
                 autoComplete="username"
               >
                 <option value="">— Изберете —</option>
@@ -80,19 +93,22 @@ export default function LoginPage() {
               </select>
             </label>
 
-            <label className="field">
-              <span className="field__label">PIN</span>
-              <input
-                className="input"
-                type="password"
-                inputMode="numeric"
-                autoComplete="current-password"
-                maxLength={6}
-                value={pin}
-                onChange={(e) => setPin(e.target.value.replace(/\D/g, ''))}
-                placeholder="••••"
-              />
-            </label>
+            {needsPin ? (
+              <label className="field">
+                <span className="field__label">PIN</span>
+                <input
+                  className="input"
+                  type="password"
+                  inputMode="numeric"
+                  autoComplete="current-password"
+                  maxLength={6}
+                  value={pin}
+                  onChange={(e) => setPin(e.target.value.replace(/\D/g, ''))}
+                  placeholder="••••"
+                  autoFocus
+                />
+              </label>
+            ) : null}
 
             {error ? (
               <p className="form-error" role="alert">

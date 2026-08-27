@@ -1,33 +1,53 @@
-/* FleetView design system (spec §68). Light background, dark text, orange accent,
-   yellow for evening shifts, green valid, red critical, gray secondary. */
+/* FleetView design system — minimalist enterprise skin. Warm neutral surfaces,
+   dark ink typography, a single orange accent, and soft pastel semantic states.
+   Visual hierarchy comes from whitespace, surface contrast, and alignment rather
+   than heavy borders or shadows. */
 
 :root {
-  --accent: #f97316;
-  --accent-dark: #ea580c;
-  --evening: #eab308;
-  --ok: #16a34a;
+  --accent: #ff5008;
+  --accent-dark: #e94705;
+  /* Soft accent wash for tints/active states (replaces old orange pastels). */
+  --accent-bg: #fff1ec;
+  --accent-border: #ffd8c8;
+
+  --evening: #eab308; /* semantic: evening shift */
+  --ok: #16a34a; /* solid green for fills (toasts, badges as background) */
   --danger: #dc2626;
   --warn: #d97706;
-  --muted: #6b7280;
+  --muted: #8f8f89;
 
-  --bg: #f4f5f7;
+  /* Warm neutral surface ladder */
+  --bg: #f5f5f3;
   --surface: #ffffff;
-  --surface-2: #f9fafb;
-  --border: #e5e7eb;
-  --text: #111827;
-  --text-2: #4b5563;
+  --surface-2: #f1f1ef;
+  --surface-3: #ebebe8;
+  --border: #e7e7e4;
+  --border-subtle: #efefed;
+  --text: #242422;
+  --text-2: #6e6e69;
 
-  --radius: 12px;
-  --radius-sm: 8px;
-  --shadow: 0 1px 3px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.04);
-  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.12);
+  /* Soft semantic backgrounds + readable text (pill badges, banners, notes) */
+  --success-bg: #eef7ef;
+  --success-text: #3f8551;
+  --warning-bg: #fff5dd;
+  --warning-text: #a9791f;
+  --danger-bg: #fff0ec;
+  --danger-text: #cf553c;
+  --info-bg: #eef3f8;
+  --info-text: #5c7188;
 
-  --header-h: 56px;
+  --radius: 14px;
+  --radius-sm: 10px;
+  --radius-pill: 999px;
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.015), 0 4px 12px rgba(0, 0, 0, 0.015);
+  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.06);
+
+  --header-h: 60px;
   --bottomnav-h: 60px;
-  --sidenav-w: 232px;
+  --sidenav-w: 240px;
 
-  --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial,
-    sans-serif;
+  --font: 'Inter', 'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
+    'Helvetica Neue', Arial, sans-serif;
 }
 
 * {
@@ -46,12 +66,24 @@ body {
   background: var(--bg);
   color: var(--text);
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
   font-size: 15px;
   line-height: 1.45;
 }
 
 button {
   font-family: inherit;
+}
+
+/* Compact headings with slightly tighter tracking for a premium feel. */
+.page__title,
+.login-card__brand h1,
+.stat__value,
+.vehicle-hero__plate,
+.vehicle-card__plate,
+.deadline__plate,
+.issue-card__plate {
+  letter-spacing: -0.02em;
 }
 
 /* ---------- Buttons ---------- */
@@ -62,14 +94,28 @@ button {
   gap: 6px;
   border: 1px solid transparent;
   border-radius: var(--radius-sm);
-  padding: 10px 16px;
-  font-size: 15px;
+  padding: 9px 16px;
+  font-size: 14px;
   font-weight: 600;
   cursor: pointer;
   background: var(--surface);
   color: var(--text);
-  transition: background 0.15s, border-color 0.15s, opacity 0.15s;
-  min-height: 44px; /* touch target (spec §66) */
+  transition: background 0.12s ease, border-color 0.12s ease, opacity 0.12s ease,
+    transform 0.08s ease, box-shadow 0.12s ease;
+  min-height: 40px; /* comfortable touch target */
+}
+/* Tactile press feedback (spec §47/§48 — subtle, no bounce). */
+.btn:active:not(:disabled) {
+  transform: translateY(1px) scale(0.99);
+}
+.btn--secondary {
+  background: var(--surface);
+  border-color: var(--border);
+  color: var(--text);
+}
+.btn--secondary:hover:not(:disabled) {
+  background: var(--surface-2);
+  border-color: var(--border-subtle);
 }
 .btn:disabled {
   opacity: 0.6;
@@ -81,6 +127,7 @@ button {
 }
 .btn--primary:hover:not(:disabled) {
   background: var(--accent-dark);
+  box-shadow: 0 2px 10px rgba(255, 80, 8, 0.22);
 }
 .btn--ghost {
   background: transparent;
@@ -89,6 +136,26 @@ button {
 }
 .btn--ghost:hover:not(:disabled) {
   background: var(--surface-2);
+}
+.btn--danger {
+  background: var(--danger);
+  color: #fff;
+}
+.btn--danger:hover:not(:disabled) {
+  background: #b91c1c;
+}
+.btn--danger-ghost {
+  background: transparent;
+  border-color: #f0d3c9;
+  color: var(--danger-text);
+}
+.btn--danger-ghost:hover:not(:disabled) {
+  background: var(--danger-bg);
+}
+.confirm-message {
+  font-size: 15px;
+  color: var(--text-2);
+  margin: 0;
 }
 .btn--sm {
   padding: 6px 12px;
@@ -122,14 +189,23 @@ button {
   min-height: 44px;
 }
 .input:focus {
-  outline: 2px solid var(--accent);
-  outline-offset: 1px;
+  outline: none;
   border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(255, 80, 8, 0.14);
 }
 .input--sm {
-  min-height: 38px;
+  min-height: 36px;
   padding: 7px 10px;
   font-size: 15px;
+}
+/* Search fields sit on a quiet secondary surface until focused (spec §20). */
+.input[type='search'] {
+  background: var(--surface-2);
+  border-color: transparent;
+}
+.input[type='search']:focus {
+  background: var(--surface);
+  border-color: var(--accent);
 }
 .form-error {
   color: var(--danger);
@@ -199,15 +275,57 @@ button {
   font-weight: 700;
 }
 .app-header__logo {
-  font-size: 22px;
+  display: inline-flex;
+  align-items: center;
+  color: var(--accent);
 }
 .app-header__title {
   font-size: 17px;
+}
+.app-header__shift {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  line-height: 1.25;
+  text-align: center;
+  min-width: 0;
+  flex: 1;
+  padding: 0 12px;
+}
+.app-header__shift-date {
+  font-size: 12px;
+  color: var(--muted);
+}
+.app-header__shift-work {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  max-width: 46vw;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.app-header__shift-work--off {
+  font-weight: 500;
+  color: var(--muted);
 }
 .app-header__user {
   display: flex;
   align-items: center;
   gap: 10px;
+}
+/* On narrow screens keep the top bar uncluttered. */
+@media (max-width: 640px) {
+  .app-header__title {
+    display: none;
+  }
+  .app-header__shift-date {
+    display: none;
+  }
+  .app-header__name {
+    display: none;
+  }
 }
 .app-header__name {
   font-size: 14px;
@@ -263,7 +381,9 @@ button {
   color: var(--accent);
 }
 .bottom-nav__icon {
-  font-size: 20px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   line-height: 1;
 }
 .bottom-nav__label {
@@ -312,14 +432,14 @@ button {
   font-size: 14px;
 }
 .banner--error {
-  background: #fef2f2;
-  color: var(--danger);
-  border: 1px solid #fecaca;
+  background: var(--danger-bg);
+  color: var(--danger-text);
+  border: 1px solid #f6d5cb;
 }
 .banner--warn {
-  background: #fffbeb;
-  color: #92400e;
-  border: 1px solid #fde68a;
+  background: var(--warning-bg);
+  color: var(--warning-text);
+  border: 1px solid #f0dfb0;
 }
 .empty-state {
   background: var(--surface);
@@ -346,7 +466,7 @@ button {
   align-items: center;
   justify-content: center;
   padding: 20px;
-  background: linear-gradient(160deg, #fff7ed 0%, var(--bg) 60%);
+  background: linear-gradient(160deg, var(--accent-bg) 0%, var(--bg) 55%);
 }
 .login-card {
   background: var(--surface);
@@ -361,7 +481,10 @@ button {
   margin-bottom: 20px;
 }
 .login-card__logo {
-  font-size: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--accent);
 }
 .login-card__brand h1 {
   font-size: 22px;
@@ -374,20 +497,88 @@ button {
 }
 
 /* ---------- Home / map ---------- */
-.home__toolbar {
-  margin-bottom: 12px;
-}
 .home__layout {
   display: flex;
   flex-direction: column;
   gap: 14px;
 }
 .home__map {
+  position: relative;
   height: 52vh;
   min-height: 320px;
   border-radius: var(--radius);
   overflow: hidden;
   box-shadow: var(--shadow);
+}
+
+/* Day navigation overlaid on the map */
+.map-nav {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 600;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text-2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: var(--shadow);
+  transition: background 0.12s ease, color 0.12s ease, border-color 0.12s ease,
+    transform 0.08s ease;
+}
+.map-nav:hover {
+  background: var(--surface-2);
+  color: var(--text);
+  border-color: #dcdcd6;
+}
+.map-nav:active {
+  transform: translateY(-50%) scale(0.92);
+}
+.map-nav--prev {
+  left: 12px;
+}
+.map-nav--next {
+  right: 12px;
+}
+.map-datechip {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 600;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 6px 6px 6px 14px;
+  box-shadow: var(--shadow);
+  font-size: 13px;
+}
+.map-datechip__weekday {
+  font-weight: 600;
+}
+.map-datechip__date {
+  color: var(--text-2);
+}
+.map-datechip__today {
+  border: none;
+  background: var(--accent);
+  color: #fff;
+  border-radius: 999px;
+  padding: 3px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.map-datechip__today:hover {
+  background: var(--accent-dark);
 }
 .sofia-map {
   height: 100%;
@@ -699,33 +890,49 @@ button {
   .side-nav {
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: 2px;
     width: var(--sidenav-w);
     flex-shrink: 0;
     padding: 16px 12px;
-    background: var(--surface);
+    background: #efefec;
     border-right: 1px solid var(--border);
   }
   .side-nav__link {
     display: flex;
     align-items: center;
     gap: 10px;
-    padding: 11px 12px;
+    padding: 9px 12px;
+    border: 1px solid transparent;
     border-radius: var(--radius-sm);
     text-decoration: none;
     color: var(--text-2);
-    font-weight: 600;
-    font-size: 15px;
+    font-weight: 500;
+    font-size: 14px;
+    transition: background 0.12s ease, color 0.12s ease;
   }
   .side-nav__link:hover {
-    background: var(--surface-2);
+    background: rgba(255, 255, 255, 0.6);
+    color: var(--text);
   }
   .side-nav__link--active {
-    background: #fff7ed;
-    color: var(--accent-dark);
+    background: var(--surface);
+    border-color: var(--border);
+    color: var(--text);
+    font-weight: 600;
+    box-shadow: var(--shadow);
+  }
+  .side-nav__link--active .side-nav__icon {
+    filter: none;
   }
   .side-nav__icon {
-    font-size: 18px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--muted);
+  }
+  .side-nav__link:hover .side-nav__icon,
+  .side-nav__link--active .side-nav__icon {
+    color: inherit;
   }
 
   /* Home: map left, panel right (spec §67) */
@@ -752,31 +959,29 @@ button {
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  font-size: 13px;
-  font-weight: 700;
-  padding: 3px 10px;
+  font-size: 12px;
+  font-weight: 500;
+  padding: 3px 9px;
   border-radius: 999px;
   border: 1px solid transparent;
 }
 .status-badge--ok {
-  background: #ecfdf5;
-  color: #047857;
-  border-color: #a7f3d0;
+  background: var(--success-bg);
+  color: var(--success-text);
 }
 .status-badge--accent {
-  background: #fff7ed;
+  background: var(--accent-bg);
   color: var(--accent-dark);
-  border-color: #fed7aa;
+  border-color: var(--accent-border);
 }
 .status-badge--danger {
-  background: #fef2f2;
-  color: var(--danger);
-  border-color: #fecaca;
+  background: var(--danger-bg);
+  color: var(--danger-text);
 }
 .status-badge--muted {
   background: var(--surface-2);
   color: var(--muted);
-  border-color: var(--border);
+  border-color: var(--border-subtle);
 }
 
 /* Fleet summary strip */
@@ -806,17 +1011,16 @@ button {
   overflow: hidden;
   text-decoration: none;
   color: inherit;
-  box-shadow: var(--shadow);
-  transition: transform 0.12s, box-shadow 0.12s;
+  transition: border-color 0.12s ease, box-shadow 0.12s ease;
 }
 .vehicle-card:hover {
-  transform: translateY(-2px);
-  box-shadow: var(--shadow-lg);
+  border-color: #dcdcd6;
+  box-shadow: var(--shadow);
 }
 .vehicle-card__media {
   position: relative;
   height: 130px;
-  background: linear-gradient(135deg, #f8fafc, #eef2f7);
+  background: #ffffff;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -824,7 +1028,12 @@ button {
 .vehicle-card__media img {
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  object-fit: contain;
+  padding: 8px;
+  transition: transform 0.28s ease;
+}
+.vehicle-card:hover .vehicle-card__media img {
+  transform: scale(1.045);
 }
 .vehicle-card__noimg {
   font-size: 44px;
@@ -899,7 +1108,7 @@ button {
   height: 120px;
   flex-shrink: 0;
   border-radius: var(--radius-sm);
-  background: linear-gradient(135deg, #f8fafc, #eef2f7);
+  background: #ffffff;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -908,7 +1117,8 @@ button {
 .vehicle-hero__media img {
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  object-fit: contain;
+  padding: 6px;
 }
 .vehicle-hero__noimg {
   font-size: 52px;
@@ -953,19 +1163,19 @@ button {
 /* Active issues box */
 .issues-box {
   margin: 16px 0;
-  border: 1px solid #fecaca;
-  background: #fef2f2;
+  border: 1px solid #f6d5cb;
+  background: var(--danger-bg);
   border-radius: var(--radius);
   padding: 14px 16px;
 }
 .issues-box__title {
   margin: 0 0 10px;
   font-size: 16px;
-  color: var(--danger);
+  color: var(--danger-text);
 }
 .issue {
   padding: 10px 0;
-  border-top: 1px solid #fecaca;
+  border-top: 1px solid #f6d5cb;
 }
 .issue:first-of-type {
   border-top: none;
@@ -1071,7 +1281,7 @@ button {
 .modal-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(17, 24, 39, 0.5);
+  background: rgba(20, 20, 20, 0.25);
   display: flex;
   align-items: flex-end;
   justify-content: center;
@@ -1155,7 +1365,7 @@ textarea.input {
   background: var(--danger);
 }
 .toast--info {
-  background: #334155;
+  background: #262624;
 }
 
 @media (min-width: 900px) {
@@ -1180,9 +1390,9 @@ textarea.input {
   margin: -6px 0 12px;
 }
 .banner--ok {
-  background: #ecfdf5;
-  color: #047857;
-  border: 1px solid #a7f3d0;
+  background: var(--success-bg);
+  color: var(--success-text);
+  border: 1px solid #cfe6d3;
 }
 
 /* My availability editor */
@@ -1282,8 +1492,13 @@ textarea.input {
 }
 .matrix thead th {
   background: var(--surface-2);
-  color: var(--text-2);
-  font-weight: 700;
+  color: var(--muted);
+  font-weight: 500;
+  font-size: 11px;
+}
+.matrix th,
+.matrix td {
+  border-bottom: 1px solid var(--border-subtle);
 }
 .matrix__row--missing .matrix__name {
   color: var(--muted);
@@ -1350,14 +1565,17 @@ textarea.input {
   padding: 3px 12px;
   border-radius: 999px;
 }
+.pill {
+  font-weight: 500;
+}
 .pill--ok {
-  background: #ecfdf5;
-  color: #047857;
+  background: var(--success-bg);
+  color: var(--success-text);
 }
 .pill--muted {
   background: var(--surface-2);
   color: var(--muted);
-  border: 1px solid var(--border);
+  border: 1px solid var(--border-subtle);
 }
 .admin-panel__counts {
   padding: 12px 0;
@@ -1424,10 +1642,10 @@ textarea.input {
 /* Payment display (СМЯНА) */
 .schedule-item__pay {
   font-size: 12px;
-  font-weight: 700;
-  color: var(--ok);
-  background: #ecfdf5;
-  border: 1px solid #a7f3d0;
+  font-weight: 600;
+  color: var(--success-text);
+  background: var(--success-bg);
+  border: 1px solid #d6e8d9;
   border-radius: 6px;
   padding: 2px 6px;
   white-space: nowrap;
@@ -1554,8 +1772,8 @@ textarea.input {
   gap: 6px;
 }
 .issue-card--critical {
-  border-color: #fecaca;
-  border-left: 4px solid var(--danger);
+  border-color: #f6d5cb;
+  border-left: 3px solid var(--danger);
 }
 .issue-card__top {
   display: flex;
@@ -1583,8 +1801,8 @@ textarea.input {
 }
 .issue-card__resolved {
   font-size: 13px;
-  color: var(--ok);
-  background: #ecfdf5;
+  color: var(--success-text);
+  background: var(--success-bg);
   border-radius: var(--radius-sm);
   padding: 6px 8px;
 }
@@ -1662,23 +1880,23 @@ textarea.input {
   flex-shrink: 0;
 }
 .doc-badge {
-  font-size: 12px;
-  font-weight: 700;
+  font-size: 11px;
+  font-weight: 500;
   white-space: nowrap;
-  padding: 4px 8px;
+  padding: 3px 9px;
   border-radius: 999px;
 }
 .doc-badge--ok {
-  background: #ecfdf5;
-  color: #047857;
+  background: var(--success-bg);
+  color: var(--success-text);
 }
 .doc-badge--warn {
-  background: #fffbeb;
-  color: #92400e;
+  background: var(--warning-bg);
+  color: var(--warning-text);
 }
 .doc-badge--danger {
-  background: #fef2f2;
-  color: var(--danger);
+  background: var(--danger-bg);
+  color: var(--danger-text);
 }
 .doc-badge--muted {
   background: var(--surface-2);
@@ -1853,14 +2071,17 @@ textarea.input {
   padding: 2px 8px;
   border-radius: 999px;
 }
+.tag {
+  font-weight: 500;
+}
 .tag--accent {
-  background: #fff7ed;
+  background: var(--accent-bg);
   color: var(--accent-dark);
 }
 .tag--muted {
   background: var(--surface-2);
   color: var(--muted);
-  border: 1px solid var(--border);
+  border: 1px solid var(--border-subtle);
 }
 
 /* Dashboard stat tiles */
@@ -1917,5 +2138,372 @@ textarea.input {
 @media (min-width: 720px) {
   .stat-grid {
     grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+/* Admin polish: explicit muted stat tone + tab panel spacing. */
+.stat--muted {
+  border-left-color: var(--muted);
+}
+.tab-panel {
+  min-height: 40px;
+}
+
+/* Own car (собствена кола): highlighted note + bonus pay marker. */
+.own-car-note {
+  background: var(--accent-bg);
+  border: 1px solid var(--accent-border);
+  border-left: 3px solid var(--accent);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  margin-bottom: 16px;
+}
+.own-car-note__title {
+  font-weight: 800;
+  margin-bottom: 6px;
+}
+.own-car-note p {
+  font-size: 14px;
+  color: var(--text-2);
+  margin: 4px 0 0;
+}
+.own-car-note__pay strong {
+  color: var(--accent-dark);
+}
+.employee-row__pay--bonus {
+  color: var(--accent-dark);
+  font-weight: 700;
+}
+
+/* Global quick search (Phase 6 search). */
+.global-search__trigger {
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  border-radius: 50%;
+  width: 32px;
+  height: 32px;
+  font-size: 14px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.12s ease, border-color 0.12s ease;
+}
+.global-search__trigger:hover {
+  background: var(--surface-3);
+  border-color: #dcdcd6;
+}
+
+.search-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(20, 20, 20, 0.25);
+  z-index: 50;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 12vh 16px 16px;
+}
+.search-palette {
+  width: 100%;
+  max-width: 560px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-lg);
+  overflow: hidden;
+}
+.search-palette__inputwrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border);
+}
+.search-palette__icon {
+  font-size: 16px;
+}
+.search-palette__input {
+  flex: 1;
+  border: none;
+  outline: none;
+  background: none;
+  font-size: 16px;
+  color: var(--text);
+}
+.search-palette__esc {
+  font-size: 11px;
+  color: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 1px 6px;
+}
+.search-palette__results {
+  max-height: 50vh;
+  overflow-y: auto;
+}
+.search-palette__empty {
+  padding: 20px 16px;
+  color: var(--muted);
+  font-size: 14px;
+  text-align: center;
+}
+.search-result {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 14px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  text-align: left;
+  border-bottom: 1px solid var(--surface-2);
+}
+.search-result--active {
+  background: var(--surface-2);
+}
+.search-result__main {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.search-result__plate {
+  font-weight: 700;
+  color: var(--text);
+}
+.search-result__sub {
+  font-size: 13px;
+  color: var(--text-2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Oil-change flag + odometer readout */
+.oil-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 500;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: var(--warning-bg);
+  color: var(--warning-text);
+  white-space: nowrap;
+}
+.vehicle-card__status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.vehicle-hero__status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.odo-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+.odo-cell {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 12px 14px;
+}
+.odo-cell__label {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--muted);
+  margin-bottom: 4px;
+}
+.odo-cell__value {
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+.odo-cell__value--warn {
+  color: var(--warning-text);
+}
+.odo-cell__sub {
+  font-size: 12px;
+  color: var(--text-2);
+  margin-top: 2px;
+}
+@media (max-width: 560px) {
+  .odo-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ============================================================
+   Motion — subtle, modern micro-interactions (spec §47/§48)
+   Short (120–320ms), fade / small slide / small scale only.
+   ============================================================ */
+
+@keyframes fv-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes fv-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(7px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes fv-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes fv-slide-up {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* Page / view entrance */
+.page,
+.home,
+.login-card {
+  animation: fv-fade-up 0.28s ease both;
+}
+
+/* Cards & rows ease in, with a light stagger for the first items in a group */
+.vehicle-card,
+.issue-card {
+  animation: fv-fade-up 0.32s ease both;
+}
+.vehicle-grid .vehicle-card:nth-child(1),
+.issue-cards .issue-card:nth-child(1) {
+  animation-delay: 0.02s;
+}
+.vehicle-grid .vehicle-card:nth-child(2),
+.issue-cards .issue-card:nth-child(2) {
+  animation-delay: 0.06s;
+}
+.vehicle-grid .vehicle-card:nth-child(3),
+.issue-cards .issue-card:nth-child(3) {
+  animation-delay: 0.1s;
+}
+.vehicle-grid .vehicle-card:nth-child(4) {
+  animation-delay: 0.14s;
+}
+.vehicle-grid .vehicle-card:nth-child(5) {
+  animation-delay: 0.18s;
+}
+.vehicle-grid .vehicle-card:nth-child(6) {
+  animation-delay: 0.22s;
+}
+
+/* Rows: smooth hover + entrance */
+.admin-row,
+.doc-item,
+.usage-item,
+.repair-item,
+.deadline {
+  transition: border-color 0.14s ease, background 0.14s ease, box-shadow 0.14s ease;
+}
+.admin-row:hover,
+.doc-item:hover {
+  border-color: #dcdcd6;
+  box-shadow: var(--shadow);
+}
+.search-result {
+  transition: background 0.12s ease;
+}
+
+/* Interactive controls: smooth state changes */
+.tab,
+.segmented__btn,
+.status-badge,
+.side-nav__link,
+.bottom-nav__link,
+.doc-item__edit,
+.date-nav__today,
+.modal__close,
+.location-panel__close,
+.global-search__trigger {
+  transition: background 0.14s ease, color 0.14s ease, border-color 0.14s ease,
+    transform 0.1s ease;
+}
+.segmented__btn:active:not(:disabled),
+.tab:active {
+  transform: scale(0.98);
+}
+.vehicle-card__warn {
+  transition: transform 0.14s ease;
+}
+.vehicle-card:hover .vehicle-card__warn {
+  transform: scale(1.08);
+}
+
+/* Modal: backdrop fades, panel rises (mobile) / pops (desktop) */
+.modal-backdrop {
+  animation: fv-fade 0.16s ease;
+}
+.modal {
+  animation: fv-slide-up 0.24s cubic-bezier(0.22, 1, 0.36, 1);
+}
+@media (min-width: 900px) {
+  .modal {
+    animation: fv-pop 0.18s ease;
+  }
+}
+
+/* Command palette + toasts */
+.search-backdrop {
+  animation: fv-fade 0.14s ease;
+}
+.search-palette {
+  animation: fv-pop 0.18s ease;
+}
+.toast {
+  animation: fv-slide-up 0.22s cubic-bezier(0.22, 1, 0.36, 1);
+  transition: transform 0.12s ease, opacity 0.12s ease;
+}
+.toast:active {
+  transform: scale(0.99);
+  opacity: 0.9;
+}
+
+/* Banners slide in gently */
+.banner {
+  animation: fv-fade-up 0.24s ease both;
+}
+
+/* Respect users who prefer reduced motion (accessibility, spec §50). */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
   }
 }

@@ -2,6 +2,7 @@
 // against Google Sheets' date coercion (same class of issue as availability).
 import { api } from '../api/client.js'
 import { toIsoDate } from '../../utils/datetime.js'
+import { CONFIG } from '../../config/index.js'
 
 function normalize(d) {
   return {
@@ -13,6 +14,7 @@ function normalize(d) {
 
 // Documents for one vehicle.
 export async function getVehicleDocuments(carId) {
+  if (carId === CONFIG.ownCar.id) return [] // own car has no documents/deadlines
   const data = await api('getVehicleDocuments', { carId })
   return (data?.documents || []).map(normalize)
 }

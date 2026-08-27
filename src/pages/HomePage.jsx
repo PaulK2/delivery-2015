@@ -1,50 +1,21 @@
 import { useEffect, useMemo, useState } from 'react'
-import { getLocations, getSchedule } from '../services/schedule/schedule.js'
-import { todayISO, weekdayIndex } from '../utils/datetime.js'
-import { CONFIG } from '../config/index.js'
-import DateNav from '../components/DateNav.jsx'
+import { useOutletContext } from 'react-router-dom'
+import { todayISO, weekdayIndex, shiftISO, weekdayBG, formatDateBG } from '../utils/datetime.js'
 import SofiaMap from '../components/SofiaMap.jsx'
 import LocationDetailPanel from '../components/LocationDetailPanel.jsx'
-import UpcomingDeadlines from '../components/UpcomingDeadlines.jsx'
+import Icon from '../components/Icon.jsx'
 import Spinner from '../components/Spinner.jsx'
-import { useAuth } from '../context/AuthContext.jsx'
 
 const norm = (s) => (s || '').toString().trim().toLowerCase()
 
 export default function HomePage() {
-  const { isAdmin } = useAuth()
+  // Schedule + locations (and today's shift) come from Layout via Outlet context.
+  const { locations, schedule, loading, error, reload, todayShift } = useOutletContext()
   const [date, setDate] = useState(todayISO())
-  const [locations, setLocations] = useState([])
-  const [schedule, setSchedule] = useState({ entries: [], locationNames: [] })
   const [selectedId, setSelectedId] = useState(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
+  const [autoFocused, setAutoFocused] = useState(false)
 
-  async function load(showSpinner = true) {
-    if (showSpinner) setLoading(true)
-    setError('')
-    try {
-      const [locs, sched] = await Promise.all([getLocations(), getSchedule()])
-      setLocations(locs)
-      setSchedule(sched)
-    } catch (e) {
-      setError(e.message || 'Данните не могат да бъдат заредени.')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  useEffect(() => {
-    load(true)
-    // Auto-refresh operational data (spec §80).
-    const id = setInterval(() => load(false), CONFIG.autoRefreshMs)
-    const onFocus = () => load(false)
-    window.addEventListener('focus', onFocus)
-    return () => {
-      clearInterval(id)
-      window.removeEventListener('focus', onFocus)
-    }
-  }, [])
+  const isToday = date === todayISO()
 
   const locByName = useMemo(() => {
     const m = new Map()
@@ -75,14 +46,26 @@ export default function HomePage() {
     return c
   }, [entriesByLocation])
 
-  // Location names present in the schedule but missing from the Locations tab
-  // (so they can't be placed on the map yet).
   const unmappedNames = useMemo(() => {
     const present = new Set(locations.map((l) => norm(l.name)))
     return [...new Set(schedule.locationNames.filter((n) => !present.has(norm(n))))]
   }, [locations, schedule.locationNames])
 
   const selectedLocation = locations.find((l) => l.location_id === selectedId) || null
+
+  // Focus the map on today's restaurant (if it has coordinates); else stay zoomed out.
+  const focus =
+    todayShift?.location && todayShift.location.latitude != null
+      ? [Number(todayShift.location.latitude), Number(todayShift.location.longitude)]
+      : null
+
+  // On first load, also select today's restaurant so the side panel opens on it.
+  useEffect(() => {
+    if (!autoFocused && todayShift?.location) {
+      setSelectedId(todayShift.location.location_id)
+      setAutoFocused(true)
+    }
+  }, [autoFocused, todayShift])
 
   if (loading) {
     return (
@@ -94,14 +77,10 @@ export default function HomePage() {
 
   return (
     <div className="home">
-      <div className="home__toolbar">
-        <DateNav date={date} onChange={setDate} />
-      </div>
-
       {error ? (
         <div className="banner banner--error" role="alert">
           {error}
-          <button className="btn btn--sm btn--ghost" onClick={() => load(true)}>
+          <button className="btn btn--sm btn--ghost" onClick={() => reload(true)}>
             Опитай отново
           </button>
         </div>
@@ -116,11 +95,38 @@ export default function HomePage() {
 
       <div className="home__layout">
         <div className="home__map">
+          <button
+            className="map-nav map-nav--prev"
+            onClick={() => setDate(shiftISO(date, -1))}
+            aria-label="Предишен ден"
+          >
+            <Icon name="chevron-left" size={20} />
+          </button>
+
+          <div className="map-datechip">
+            <span className="map-datechip__weekday">{weekdayBG(date)}</span>
+            <span className="map-datechip__date">{formatDateBG(date)}</span>
+            {!isToday ? (
+              <button className="map-datechip__today" onClick={() => setDate(todayISO())}>
+                Днес
+              </button>
+            ) : null}
+          </div>
+
+          <button
+            className="map-nav map-nav--next"
+            onClick={() => setDate(shiftISO(date, 1))}
+            aria-label="Следващ ден"
+          >
+            <Icon name="chevron-right" size={20} />
+          </button>
+
           <SofiaMap
             locations={locations}
             countsByLocation={countsByLocation}
             selectedId={selectedId}
             onSelect={setSelectedId}
+            focus={focus}
           />
         </div>
 
@@ -138,16 +144,12 @@ export default function HomePage() {
                 Изберете локация от картата, за да видите кой работи там.
               </p>
               {locations.length === 0 ? (
-                <div className="empty-state empty-state--sm">
-                  Няма добавени работни локации.
-                </div>
+                <div className="empty-state empty-state--sm">Няма добавени работни локации.</div>
               ) : null}
             </div>
           )}
         </div>
       </div>
-
-      {isAdmin ? <UpcomingDeadlines /> : null}
     </div>
   )
 }
