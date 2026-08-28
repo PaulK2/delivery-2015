@@ -3,6 +3,7 @@
 
 const FONT_KEY = 'fv_font_scale' // 'lg' when large text is on
 const INTRO_KEY = 'fv_intro_seen' // '1' once the first-run intro is dismissed
+const VIEW_KEY = 'fv_view_as_worker' // '1' when a worker-admin is viewing the worker UI
 
 function safeGet(key) {
   try {
@@ -38,6 +39,15 @@ export function setLargeText(on) {
   safeSet(FONT_KEY, on ? 'lg' : null)
   applyFontScale()
   return on
+}
+
+// ---- "View as worker" (worker-admins only) ----
+
+export function isViewAsWorker() {
+  return safeGet(VIEW_KEY) === '1'
+}
+export function setViewAsWorkerPref(on) {
+  safeSet(VIEW_KEY, on ? '1' : null)
 }
 
 // ---- First-run intro ----

@@ -311,20 +311,22 @@ function WorkerDay() {
                     }}
                   />
                 </div>
-                {countEdited && Number(countInput || 0) !== itemisedCount ? (
-                  <button
-                    type="button"
-                    className="report-sync"
-                    onClick={() => {
-                      setCountEdited(false)
-                      setCountInput(String(itemisedCount))
-                    }}
-                  >
-                    Изчисли от доставките ({itemisedCount})
-                  </button>
-                ) : (
-                  <div className="report-count-note">Изчислено от доставките.</div>
-                )}
+                <div className="report-count-meta">
+                  {countEdited && Number(countInput || 0) !== itemisedCount ? (
+                    <button
+                      type="button"
+                      className="report-sync"
+                      onClick={() => {
+                        setCountEdited(false)
+                        setCountInput(String(itemisedCount))
+                      }}
+                    >
+                      Изчисли от доставките ({itemisedCount})
+                    </button>
+                  ) : (
+                    <span className="report-count-note">Изчислено от доставките.</span>
+                  )}
+                </div>
                 <div className="report-row report-row--total">
                   <span className="report-row__label">Заплащане от поръчки</span>
                   <span className="report-row__input">{formatEuro(effectiveCount * ORDER_RATE_EUR)}</span>

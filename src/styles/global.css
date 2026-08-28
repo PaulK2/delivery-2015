@@ -3356,10 +3356,15 @@ input.report-row__input { min-height: 40px; }
   text-align: right;
   font-weight: 800;
 }
+/* The auto/manual note sits right-aligned under the count input, padded to match rows. */
+.report-count-meta {
+  display: flex;
+  justify-content: flex-end;
+  padding: 4px 14px 10px;
+}
 .report-count-note {
   font-size: 13px;
   color: var(--muted);
-  margin: 2px 0 8px;
 }
 .report-sync {
   border: none;
@@ -3370,7 +3375,6 @@ input.report-row__input { min-height: 40px; }
   font-size: 13px;
   font-weight: 700;
   cursor: pointer;
-  margin: 2px 0 10px;
 }
 
 .empty-state__hint {
@@ -3538,7 +3542,7 @@ input.report-row__input { min-height: 40px; }
 .more-page__hint {
   font-size: 13px;
   color: var(--muted);
-  margin: 6px 2px 0;
+  margin: 6px 2px 14px;
 }
 .help-steps {
   margin: 0;

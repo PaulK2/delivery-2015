@@ -10,7 +10,7 @@ import {
 import { getEmployees } from '../services/employees/employees.js'
 import { useAuth } from '../context/AuthContext.jsx'
 import { useToast } from '../context/ToastContext.jsx'
-import { formatDateBG, todayISO, weekdayIndex } from '../utils/datetime.js'
+import { formatDateBG } from '../utils/datetime.js'
 import DayShiftSelector from '../components/DayShiftSelector.jsx'
 import TeamAvailabilityMatrix from '../components/TeamAvailabilityMatrix.jsx'
 import AdminAvailabilityPanel from '../components/AdminAvailabilityPanel.jsx'
@@ -120,10 +120,9 @@ export default function AvailabilityPage() {
   // is authoritative; fall back to role when it isn't present (older backend).
   const canSubmit = user?.can_submit_availability ?? !isAdmin
 
-  // Submitters can request/edit shifts only until 00:00 Saturday; on Sat/Sun it's locked.
-  const weekday = weekdayIndex(todayISO()) // 0=Sun … 6=Sat
-  const weekendLocked = canSubmit && (weekday === 6 || weekday === 0)
-  const canEdit = open && !weekendLocked
+  // Submitters may request/edit shifts for the whole week the приём is open — including
+  // Saturday and Sunday. It closes only when an admin closes it.
+  const canEdit = open
 
   const weekLabel =
     dates.length === 7 ? `${formatDateBG(dates[0])} – ${formatDateBG(dates[6])}` : ''
@@ -136,11 +135,9 @@ export default function AvailabilityPage() {
       <div className={'banner ' + (!canSubmit ? 'banner--info' : canEdit ? 'banner--ok' : 'banner--warn')}>
         {!canSubmit
           ? 'Преглед на заявките на екипа. Администраторите не подават собствени заявки за смени.'
-          : weekendLocked
-            ? 'Заявките за смени вече не могат да се редактират — приемът е заключен за събота и неделя.'
-            : open
-              ? 'Приемът на наличност е отворен. Изберете кога сте на разположение.'
-              : 'Приемът на наличност е затворен. Можете само да преглеждате.'}
+          : open
+            ? 'Приемът на наличност е отворен. Изберете кога сте на разположение.'
+            : 'Приемът на наличност е затворен. Можете само да преглеждате.'}
       </div>
 
       {/* My availability editor — for anyone who may submit (regular staff + worker-admins).

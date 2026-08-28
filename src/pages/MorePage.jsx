@@ -8,7 +8,7 @@ import { isLargeText, setLargeText } from '../utils/uiPrefs.js'
 // Secondary destinations + settings, shown as big, clearly-labelled buttons so nothing
 // is a guess. This is the "Още" target from the bottom bar (mobile especially).
 export default function MorePage() {
-  const { user, isAdmin, logout } = useAuth()
+  const { user, isAdmin, logout, canToggleView, viewAsWorker, setViewAsWorker } = useAuth()
   const [big, setBig] = useState(() => isLargeText())
 
   const moreItems = NAV_ITEMS.filter(
@@ -41,6 +41,25 @@ export default function MorePage() {
 
       <section className="detail-section">
         <h2 className="detail-section__title">Настройки</h2>
+
+        {canToggleView ? (
+          <>
+            <button
+              type="button"
+              className={'toggle-row' + (viewAsWorker ? ' toggle-row--on' : '')}
+              onClick={() => setViewAsWorker(!viewAsWorker)}
+              aria-pressed={viewAsWorker}
+            >
+              <span className="toggle-row__label">Изглед на работник</span>
+              <span className="toggle-row__state">{viewAsWorker ? 'Включен' : 'Изключен'}</span>
+            </button>
+            <p className="more-page__hint">
+              Показва по-опростения изглед на обикновен работник (без администраторски
+              функции). Може да превключвате обратно по всяко време оттук.
+            </p>
+          </>
+        ) : null}
+
         <button
           type="button"
           className={'toggle-row' + (big ? ' toggle-row--on' : '')}
