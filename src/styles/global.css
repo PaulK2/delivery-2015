@@ -396,7 +396,10 @@ button {
   flex: 1;
   min-width: 0;
   padding: 16px;
-  padding-bottom: calc(var(--bottomnav-h) + 16px);
+  /* Clear the fixed bottom nav, INCLUDING the iOS home-indicator safe area — the nav's
+     real height is --bottomnav-h + env(safe-area-inset-bottom), so page content must
+     reserve the same or the bottom of each page hides behind the nav. */
+  padding-bottom: calc(var(--bottomnav-h) + env(safe-area-inset-bottom, 0px) + 16px);
 }
 
 /* ---------- Bottom nav (mobile) ---------- */
@@ -1693,7 +1696,7 @@ textarea.input {
   position: fixed;
   left: 50%;
   transform: translateX(-50%);
-  bottom: calc(var(--bottomnav-h) + 16px);
+  bottom: calc(var(--bottomnav-h) + env(safe-area-inset-bottom, 0px) + 16px);
   display: flex;
   flex-direction: column;
   gap: 8px;
