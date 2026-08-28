@@ -12,7 +12,6 @@ import {
 } from '../config/index.js'
 import { getDailyReport, saveDailyReport, getReportsForDate } from '../services/reports/reports.js'
 import { getOrdersForWeek } from '../services/orders/orders.js'
-import Modal from '../components/Modal.jsx'
 import Spinner from '../components/Spinner.jsx'
 
 // Parse a money string ("42,27" / "42.27" / "42") into a number, or null when empty /
@@ -293,7 +292,16 @@ function AdminReports() {
   const [date, setDate] = useState(() => todayISO())
   const [rows, setRows] = useState([])
   const [loading, setLoading] = useState(true)
-  const [open, setOpen] = useState(null) // { restaurant, employee_id }
+  // Keys (`restaurant|employee_id`) of the worker panels expanded inline.
+  const [expanded, setExpanded] = useState(() => new Set())
+
+  const toggle = (key) =>
+    setExpanded((prev) => {
+      const next = new Set(prev)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      return next
+    })
 
   async function load() {
     setLoading(true)
@@ -337,13 +345,6 @@ function AdminReports() {
       }))
   }, [rows])
 
-  const openReport = useMemo(() => {
-    if (!open) return null
-    const g = grouped.find((x) => x.restaurant === open.restaurant)
-    const w = g?.workers.find((x) => x.employee_id === open.employee_id)
-    return w ? { ...w, restaurant: open.restaurant } : null
-  }, [open, grouped])
-
   return (
     <div>
       <DayNav date={date} onChange={setDate} />
@@ -358,22 +359,64 @@ function AdminReports() {
             <section key={g.restaurant} className="report-group">
               <h2 className="report-group__title">{g.restaurant}</h2>
 
-              <div className="report-group__workers">
+              {/* Workers collapsed to just their name + total; expand to see each receipt. */}
+              <div className="report-acc-list">
                 {g.workers.map((w) => {
                   const cats = Object.values(w.cats)
                   const count = cats.reduce((a, c) => a + c.count, 0)
                   const sum = cats.reduce((a, c) => a + c.sum, 0)
+                  const key = g.restaurant + '|' + w.employee_id
+                  const isOpen = expanded.has(key)
                   return (
-                    <button
-                      key={w.employee_id}
-                      className="report-worker"
-                      onClick={() => setOpen({ restaurant: g.restaurant, employee_id: w.employee_id })}
-                    >
-                      <span>{w.name}</span>
-                      <span className="report-worker__total">
-                        {count} бр. · {formatEuro(sum)}
-                      </span>
-                    </button>
+                    <div key={w.employee_id} className={'report-acc' + (isOpen ? ' report-acc--open' : '')}>
+                      <button
+                        className="report-acc__head"
+                        onClick={() => toggle(key)}
+                        aria-expanded={isOpen}
+                      >
+                        <span className="report-acc__chev" aria-hidden="true">
+                          {isOpen ? '▾' : '▸'}
+                        </span>
+                        <span className="report-acc__name">{w.name}</span>
+                        <span className="report-worker__total">
+                          {count} бр. · {formatEuro(sum)}
+                        </span>
+                      </button>
+
+                      {isOpen ? (
+                        <div className="report-acc__body">
+                          {deliveryTypesForRestaurant(g.restaurant)
+                            .filter((t) => w.cats[t.key])
+                            .map((t) => {
+                              const cat = w.cats[t.key]
+                              const items = w.deliveries.filter((d) => d.delivery_type === t.key)
+                              return (
+                                <div key={t.key} className="report-cat-detail">
+                                  <div className="report-row report-row--sm">
+                                    <span className="report-row__label">{t.label}</span>
+                                    <span className="report-row__input">
+                                      {cat.count} бр. · {formatEuro(cat.sum)}
+                                    </span>
+                                  </div>
+                                  <div className="report-cat-detail__items">
+                                    {items.map((d) => (
+                                      <span key={d.report_id} className="report-chip">
+                                        {formatEuro(d.amount)}
+                                      </span>
+                                    ))}
+                                  </div>
+                                </div>
+                              )
+                            })}
+                          <div className="report-row report-row--total">
+                            <span className="report-row__label">Общо</span>
+                            <span className="report-row__input">
+                              {count} бр. · {formatEuro(sum)}
+                            </span>
+                          </div>
+                        </div>
+                      ) : null}
+                    </div>
                   )
                 })}
               </div>
@@ -394,51 +437,6 @@ function AdminReports() {
           ))}
         </div>
       )}
-
-      {openReport ? (
-        <Modal title="Отчет" onClose={() => setOpen(null)}>
-          <div className="report-receipt">
-            <div className="report-receipt__head">
-              <strong>{openReport.name}</strong>
-              <div className="report-receipt__meta">
-                {openReport.restaurant} · {formatDateBG(date)}
-              </div>
-            </div>
-            <hr />
-            {deliveryTypesForRestaurant(openReport.restaurant)
-              .filter((t) => openReport.cats[t.key])
-              .map((t) => {
-                const cat = openReport.cats[t.key]
-                const items = openReport.deliveries.filter((d) => d.delivery_type === t.key)
-                return (
-                  <div key={t.key} className="report-cat-detail">
-                    <div className="report-row report-row--sm">
-                      <span className="report-row__label">{t.label}</span>
-                      <span className="report-row__input">
-                        {cat.count} бр. · {formatEuro(cat.sum)}
-                      </span>
-                    </div>
-                    <div className="report-cat-detail__items">
-                      {items.map((d) => (
-                        <span key={d.report_id} className="report-chip">
-                          {formatEuro(d.amount)}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                )
-              })}
-            <hr />
-            <div className="report-row report-row--total">
-              <span className="report-row__label">Общо</span>
-              <span className="report-row__input">
-                {openReport.deliveries.length} бр. ·{' '}
-                {formatEuro(openReport.deliveries.reduce((a, d) => a + d.amount, 0))}
-              </span>
-            </div>
-          </div>
-        </Modal>
-      ) : null}
     </div>
   )
 }

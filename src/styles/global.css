@@ -3104,6 +3104,37 @@ input.report-row__input { min-height: 40px; }
 .report-totals { border-top: 1px dashed var(--border); padding-top: 10px; }
 .report-totals__title { font-weight: 700; color: var(--text-2); margin-bottom: 4px; }
 
+/* Admin worker accordion: collapsed = name + total; expands to the receipts. */
+.report-acc-list { display: grid; gap: 8px; margin-bottom: 14px; }
+.report-acc {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  overflow: hidden;
+}
+.report-acc--open { border-color: var(--accent); }
+.report-acc__head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+  padding: 10px 12px;
+  border: none;
+  background: transparent;
+  color: var(--text);
+}
+.report-acc__head:hover { background: var(--surface); }
+.report-acc__chev { color: var(--text-2); font-size: 12px; width: 14px; flex: 0 0 auto; }
+.report-acc__name { font-weight: 600; flex: 1 1 auto; }
+.report-acc__body {
+  padding: 4px 12px 12px;
+  border-top: 1px dashed var(--border);
+  background: var(--surface);
+}
+
 /* Report receipt (admin drill-down) */
 .report-receipt__head { margin-bottom: 6px; }
 .report-receipt__meta { color: var(--text-2); font-size: 13px; }

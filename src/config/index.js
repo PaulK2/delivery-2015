@@ -22,7 +22,7 @@ export function setApiUrl(url) {
 
 // Bump on each deploy so we can confirm which frontend build is actually live (shown
 // on the login screen and logged to the console at startup).
-export const APP_VERSION = 'ui-2026-08-28-reports-value-based-retry'
+export const APP_VERSION = 'ui-2026-08-28-report-preview-accordion'
 
 export const CONFIG = {
   appName: 'Delivery 2015',
