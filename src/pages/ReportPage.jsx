@@ -1,10 +1,10 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useOutletContext } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext.jsx'
 import { useToast } from '../context/ToastContext.jsx'
 import { todayISO, shiftISO, weekdayBG, formatDateBG, mondayOfWeekISO } from '../utils/datetime.js'
 import { myShiftForDate } from '../utils/work.js'
-import { SHIFT_LABELS } from '../utils/shifts.js'
+import { SHIFT_LABELS, formatEuro } from '../utils/shifts.js'
 import {
   deliveryTypesForRestaurant,
   DELIVERY_TYPES,
@@ -14,6 +14,26 @@ import { getDailyReport, saveDailyReport, getReportsForDate } from '../services/
 import { getOrdersForWeek } from '../services/orders/orders.js'
 import Modal from '../components/Modal.jsx'
 import Spinner from '../components/Spinner.jsx'
+
+// Parse a money string ("42,27" / "42.27" / "42") into a number, or null when empty /
+// invalid. Accepts a Bulgarian decimal comma. Used to derive per-category sums and the
+// delivery count (how many valid amounts were entered).
+function parseAmount(str) {
+  const s = String(str == null ? '' : str).trim().replace(',', '.')
+  if (s === '' || !/^\d+(\.\d{1,2})?$/.test(s)) return null
+  return parseFloat(s)
+}
+
+// Keep only digits and a single decimal separator while the user types.
+function sanitizeAmount(str) {
+  return String(str).replace(/[^\d.,]/g, '')
+}
+
+// Money value -> editable display string with a Bulgarian decimal comma.
+function amountToInput(value) {
+  if (!value && value !== 0) return ''
+  return String(Number(value)).replace('.', ',')
+}
 
 // Prev / Днес / Next day navigator.
 function DayNav({ date, onChange }) {
@@ -80,11 +100,14 @@ function WorkerReport() {
   const { showToast } = useToast()
 
   const [date, setDate] = useState(() => todayISO())
-  const [inputs, setInputs] = useState({}) // delivery_type -> string
+  // Each entry is one delivery: { id, type, amount } where amount is the raw input string.
+  const [entries, setEntries] = useState([])
   const [ordersCount, setOrdersCount] = useState(null) // from Поръчки, for the cross-check
   const [savedRestaurant, setSavedRestaurant] = useState('') // from an existing report
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const idSeq = useRef(0)
+  const newId = () => `e${++idSeq.current}`
 
   const shift = useMemo(
     () => myShiftForDate(schedule.entries, user.name, date),
@@ -105,13 +128,10 @@ function WorkerReport() {
       ])
       const rest = shift?.location_name || rows[0]?.restaurant || ''
       setSavedRestaurant(rows[0]?.restaurant || '')
-      const seeded = {}
-      rows
+      const seeded = rows
         .filter((r) => !rest || r.restaurant === rest)
-        .forEach((r) => {
-          seeded[r.delivery_type] = String(r.count)
-        })
-      setInputs(seeded)
+        .map((r) => ({ id: newId(), type: r.delivery_type, amount: amountToInput(r.amount) }))
+      setEntries(seeded)
       const ord = weekOrders.find((o) => o.date === date)
       setOrdersCount(ord ? ord.order_count : null)
     } finally {
@@ -124,19 +144,34 @@ function WorkerReport() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [date, user.employee_id])
 
-  const total = useMemo(
-    () => types.reduce((n, t) => n + (Number(inputs[t.key]) || 0), 0),
-    [types, inputs]
+  function addEntry(type) {
+    setEntries((s) => [...s, { id: newId(), type, amount: '' }])
+  }
+  function updateEntry(id, amount) {
+    setEntries((s) => s.map((e) => (e.id === id ? { ...e, amount: sanitizeAmount(amount) } : e)))
+  }
+  function removeEntry(id) {
+    setEntries((s) => s.filter((e) => e.id !== id))
+  }
+
+  // Only entries with a valid amount count as real deliveries.
+  const validEntries = useMemo(
+    () => entries.filter((e) => parseAmount(e.amount) != null),
+    [entries]
+  )
+  const totalCount = validEntries.length
+  const totalSum = useMemo(
+    () => validEntries.reduce((n, e) => n + parseAmount(e.amount), 0),
+    [validEntries]
   )
 
   async function save() {
-    const counts = {}
-    types.forEach((t) => {
-      counts[t.key] = Number(inputs[t.key]) || 0
-    })
+    const deliveries = entries
+      .map((e) => ({ delivery_type: e.type, amount: parseAmount(e.amount) }))
+      .filter((d) => d.amount != null)
     setSaving(true)
     try {
-      await saveDailyReport({ date, restaurant, counts })
+      await saveDailyReport({ date, restaurant, deliveries })
       showToast('Отчетът е записан.', 'success')
       await load()
     } catch (e) {
@@ -170,31 +205,74 @@ function WorkerReport() {
             <div className="empty-state">Не може да въвеждате отчет за бъдещ ден.</div>
           ) : (
             <>
+              <p className="report-hint">
+                Въведете стойността на всяка доставка (напр. 42,27). Броят доставки се
+                изчислява автоматично от въведените стойности.
+              </p>
+
+              <div className="report-deliveries">
+                {types.map((t) => {
+                  const catEntries = entries.filter((e) => e.type === t.key)
+                  const catValid = catEntries.filter((e) => parseAmount(e.amount) != null)
+                  const catSum = catValid.reduce((n, e) => n + parseAmount(e.amount), 0)
+                  return (
+                    <section key={t.key} className="delivery-cat">
+                      <div className="delivery-cat__head">
+                        <span className="delivery-cat__label">{t.label}</span>
+                        <span className="delivery-cat__meta">
+                          {catValid.length} бр. · {formatEuro(catSum)}
+                        </span>
+                      </div>
+
+                      <div className="delivery-cat__list">
+                        {catEntries.map((e) => (
+                          <div key={e.id} className="delivery-entry">
+                            <input
+                              className="input delivery-entry__input"
+                              inputMode="decimal"
+                              value={e.amount}
+                              onChange={(ev) => updateEntry(e.id, ev.target.value)}
+                              placeholder="напр. 42,27"
+                            />
+                            <span className="delivery-entry__cur">€</span>
+                            <button
+                              type="button"
+                              className="delivery-entry__del"
+                              onClick={() => removeEntry(e.id)}
+                              aria-label="Изтрий доставката"
+                            >
+                              ×
+                            </button>
+                          </div>
+                        ))}
+                        <button
+                          type="button"
+                          className="btn btn--ghost btn--sm delivery-cat__add"
+                          onClick={() => addEntry(t.key)}
+                        >
+                          + Добави доставка
+                        </button>
+                      </div>
+                    </section>
+                  )
+                })}
+              </div>
+
               <div className="report-form">
-                {types.map((t) => (
-                  <label key={t.key} className="report-row">
-                    <span className="report-row__label">{t.label}</span>
-                    <input
-                      className="input report-row__input"
-                      inputMode="numeric"
-                      value={inputs[t.key] ?? ''}
-                      onChange={(e) =>
-                        setInputs((s) => ({ ...s, [t.key]: e.target.value.replace(/\D/g, '') }))
-                      }
-                      placeholder="0"
-                    />
-                  </label>
-                ))}
                 <div className="report-row report-row--total">
                   <span className="report-row__label">Общо доставки</span>
-                  <span className="report-row__input">{total}</span>
+                  <span className="report-row__input">{totalCount}</span>
+                </div>
+                <div className="report-row report-row--total">
+                  <span className="report-row__label">Обща сума</span>
+                  <span className="report-row__input">{formatEuro(totalSum)}</span>
                 </div>
               </div>
 
-              {ordersCount != null && ordersCount !== total ? (
+              {ordersCount != null && ordersCount !== totalCount ? (
                 <p className="banner banner--warn" role="status">
-                  Поръчки: {ordersCount} · Отчет общо: {total}. Общият брой в отчета се различава
-                  от въведения брой поръчки.
+                  Поръчки: {ordersCount} · Отчет: {totalCount} доставки. Броят доставки в
+                  отчета се различава от въведения брой поръчки.
                 </p>
               ) : null}
 
@@ -215,7 +293,7 @@ function AdminReports() {
   const [date, setDate] = useState(() => todayISO())
   const [rows, setRows] = useState([])
   const [loading, setLoading] = useState(true)
-  const [open, setOpen] = useState(null) // { restaurant, employee_id, name }
+  const [open, setOpen] = useState(null) // { restaurant, employee_id }
 
   async function load() {
     setLoading(true)
@@ -231,16 +309,24 @@ function AdminReports() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [date])
 
-  // Group rows: restaurant -> { workers: Map(id -> {name, counts}), totals: {type: sum} }.
+  // Group rows: restaurant -> { workers: Map(id -> {name, cats:{type:{count,sum}}, deliveries}),
+  // totals: {type: {count, sum}} }. Each row is one delivery with an amount.
   const grouped = useMemo(() => {
     const map = new Map()
     for (const r of rows) {
       if (!map.has(r.restaurant)) map.set(r.restaurant, { workers: new Map(), totals: {} })
       const g = map.get(r.restaurant)
       const id = String(r.employee_id)
-      if (!g.workers.has(id)) g.workers.set(id, { employee_id: id, name: r.employee_name, counts: {} })
-      g.workers.get(id).counts[r.delivery_type] = r.count
-      g.totals[r.delivery_type] = (g.totals[r.delivery_type] || 0) + r.count
+      if (!g.workers.has(id))
+        g.workers.set(id, { employee_id: id, name: r.employee_name, cats: {}, deliveries: [] })
+      const w = g.workers.get(id)
+      if (!w.cats[r.delivery_type]) w.cats[r.delivery_type] = { count: 0, sum: 0 }
+      w.cats[r.delivery_type].count += 1
+      w.cats[r.delivery_type].sum += r.amount
+      w.deliveries.push(r)
+      if (!g.totals[r.delivery_type]) g.totals[r.delivery_type] = { count: 0, sum: 0 }
+      g.totals[r.delivery_type].count += 1
+      g.totals[r.delivery_type].sum += r.amount
     }
     return [...map.entries()]
       .sort((a, b) => locationOrderRank(a[0]) - locationOrderRank(b[0]) || a[0].localeCompare(b[0], 'bg'))
@@ -273,27 +359,34 @@ function AdminReports() {
               <h2 className="report-group__title">{g.restaurant}</h2>
 
               <div className="report-group__workers">
-                {g.workers.map((w) => (
-                  <button
-                    key={w.employee_id}
-                    className="report-worker"
-                    onClick={() => setOpen({ restaurant: g.restaurant, employee_id: w.employee_id })}
-                  >
-                    <span>{w.name}</span>
-                    <span className="report-worker__total">
-                      {Object.values(w.counts).reduce((a, b) => a + b, 0)}
-                    </span>
-                  </button>
-                ))}
+                {g.workers.map((w) => {
+                  const cats = Object.values(w.cats)
+                  const count = cats.reduce((a, c) => a + c.count, 0)
+                  const sum = cats.reduce((a, c) => a + c.sum, 0)
+                  return (
+                    <button
+                      key={w.employee_id}
+                      className="report-worker"
+                      onClick={() => setOpen({ restaurant: g.restaurant, employee_id: w.employee_id })}
+                    >
+                      <span>{w.name}</span>
+                      <span className="report-worker__total">
+                        {count} бр. · {formatEuro(sum)}
+                      </span>
+                    </button>
+                  )
+                })}
               </div>
 
-              {/* Restaurant-level totals for the day (§39) */}
+              {/* Restaurant-level totals for the day: count + summed value per category. */}
               <div className="report-totals">
                 <div className="report-totals__title">Общо за деня</div>
                 {DELIVERY_TYPES.filter((t) => g.totals[t.key] != null).map((t) => (
                   <div key={t.key} className="report-row report-row--sm">
                     <span className="report-row__label">{t.label}</span>
-                    <span className="report-row__input">{g.totals[t.key]}</span>
+                    <span className="report-row__input">
+                      {g.totals[t.key].count} бр. · {formatEuro(g.totals[t.key].sum)}
+                    </span>
                   </div>
                 ))}
               </div>
@@ -312,17 +405,35 @@ function AdminReports() {
               </div>
             </div>
             <hr />
-            {deliveryTypesForRestaurant(openReport.restaurant).map((t) => (
-              <div key={t.key} className="report-row report-row--sm">
-                <span className="report-row__label">{t.label}</span>
-                <span className="report-row__input">{openReport.counts[t.key] || 0}</span>
-              </div>
-            ))}
+            {deliveryTypesForRestaurant(openReport.restaurant)
+              .filter((t) => openReport.cats[t.key])
+              .map((t) => {
+                const cat = openReport.cats[t.key]
+                const items = openReport.deliveries.filter((d) => d.delivery_type === t.key)
+                return (
+                  <div key={t.key} className="report-cat-detail">
+                    <div className="report-row report-row--sm">
+                      <span className="report-row__label">{t.label}</span>
+                      <span className="report-row__input">
+                        {cat.count} бр. · {formatEuro(cat.sum)}
+                      </span>
+                    </div>
+                    <div className="report-cat-detail__items">
+                      {items.map((d) => (
+                        <span key={d.report_id} className="report-chip">
+                          {formatEuro(d.amount)}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )
+              })}
             <hr />
             <div className="report-row report-row--total">
               <span className="report-row__label">Общо</span>
               <span className="report-row__input">
-                {Object.values(openReport.counts).reduce((a, b) => a + b, 0)}
+                {openReport.deliveries.length} бр. ·{' '}
+                {formatEuro(openReport.deliveries.reduce((a, d) => a + d.amount, 0))}
               </span>
             </div>
           </div>

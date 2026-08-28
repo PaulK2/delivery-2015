@@ -5,15 +5,17 @@ import { cachedRequest, invalidatePrefix } from '../api/cache.js'
 
 const REPORTS_TTL = 30 * 1000
 
-// Save (create or update) the current worker's report for a date+restaurant.
-// `counts` is a map of delivery-type key -> number.
-export async function saveDailyReport({ date, restaurant, counts }) {
-  const res = await api('saveDailyReport', { date, restaurant, counts })
+// Save the current worker's report for a date+restaurant as INDIVIDUAL deliveries.
+// `deliveries` is an array of { delivery_type, amount } — one entry per delivery. The
+// save fully replaces the worker's rows for that date+restaurant, so adding, editing or
+// removing a delivery on the client is reflected exactly server-side.
+export async function saveDailyReport({ date, restaurant, deliveries }) {
+  const res = await api('saveDailyReport', { date, restaurant, deliveries })
   invalidatePrefix('reports')
   return res
 }
 
-// A worker's report for a date, as flat rows [{ delivery_type, count, ... }].
+// A worker's report for a date, as flat rows [{ delivery_type, amount, ... }].
 // Non-admins are scoped to themselves server-side; admins may pass employeeId/restaurant.
 export async function getDailyReport({ date, employeeId = '', restaurant = '', force } = {}) {
   return cachedRequest(

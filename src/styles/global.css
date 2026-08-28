@@ -3108,6 +3108,66 @@ input.report-row__input { min-height: 40px; }
 .report-receipt__head { margin-bottom: 6px; }
 .report-receipt__meta { color: var(--text-2); font-size: 13px; }
 .report-receipt hr { border: none; border-top: 1px dashed var(--border); margin: 8px 0; }
+.report-cat-detail { padding: 4px 0; }
+.report-cat-detail__items {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 4px 0 8px;
+}
+.report-chip {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  border: 1px solid var(--border-subtle);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-2);
+}
+
+/* Value-based daily report entry (worker view) */
+.report-hint {
+  color: var(--text-2);
+  font-size: 13px;
+  margin: 0 0 12px;
+}
+.report-deliveries { display: grid; gap: 12px; margin-bottom: 14px; }
+.delivery-cat {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  overflow: hidden;
+}
+.delivery-cat__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 14px;
+  background: var(--surface-2);
+  border-bottom: 1px solid var(--border-subtle);
+}
+.delivery-cat__label { font-weight: 700; }
+.delivery-cat__meta { font-size: 13px; color: var(--text-2); font-weight: 600; }
+.delivery-cat__list { display: grid; gap: 8px; padding: 12px 14px; }
+.delivery-entry { display: flex; align-items: center; gap: 8px; }
+.delivery-entry__input { flex: 1 1 auto; text-align: right; min-height: 40px; }
+.delivery-entry__cur { color: var(--text-2); font-weight: 700; }
+.delivery-entry__del {
+  flex: 0 0 auto;
+  width: 34px;
+  height: 34px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--danger);
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+}
+.delivery-entry__del:hover { border-color: var(--danger); }
+.delivery-cat__add { justify-self: start; }
 
 /* Safety-equipment checklist (take-car modal) */
 .equip-check { display: grid; gap: 8px; margin-top: 4px; }

@@ -38,7 +38,7 @@ var SESSION_TTL_DAYS = 30;
 // Bump on every meaningful backend change. Visible via doGet (open the /exec URL in a
 // browser) so you can confirm which code the DEPLOYED web app is actually running —
 // Apps Script serves the last DEPLOYED VERSION, not merely the saved script.
-var BACKEND_VERSION = '2026-08-28-orders-payroll-fuel-reports';
+var BACKEND_VERSION = '2026-08-28-reports-value-based';
 
 // Each completed delivery order is worth this much toward the worker's weekly pay.
 var ORDER_RATE_EUR = 0.5;
@@ -267,7 +267,7 @@ var DEFAULT_HEADERS = {
     'week_start',
     'restaurant',
     'delivery_type',
-    'count',
+    'amount',
     'updated_at'
   ],
 
@@ -4675,14 +4675,19 @@ function serializeReportRow(row) {
     week_start: normalizeIsoDate(row.week_start),
     restaurant: row.restaurant || '',
     delivery_type: row.delivery_type || '',
-    count: toNumberOrNull(row.count) || 0,
+    // Money value of a single delivery. Reads the new `amount` column, falling back to
+    // the legacy `count` column for rows written before the value-based redesign.
+    amount: toNumberOrNull(row.amount != null && row.amount !== '' ? row.amount : row.count) || 0,
     updated_at: row.updated_at
   };
 }
 
 
-// Worker saves/updates a daily report (one normalized row per delivery category), keyed
-// by employee+date+restaurant so re-saving edits in place instead of duplicating.
+// Worker saves their daily report as INDIVIDUAL deliveries: one row per delivery, each
+// with its money value. `params.deliveries` is an array of { delivery_type, amount }.
+// The save fully replaces the worker's rows for this date+restaurant (delete + re-insert),
+// so adding, editing or removing a delivery on the client is reflected exactly. The count
+// per category is simply how many rows a category has; the sum is the sum of their amounts.
 function saveDailyReport(params, ctx) {
 
   var notWorker = requireWorker(ctx);
@@ -4695,39 +4700,41 @@ function saveDailyReport(params, ctx) {
   var restaurant = String(params.restaurant || '').trim();
   if (!restaurant) return fail('validation');
 
-  var counts = params.counts || {};
+  var deliveries = params.deliveries;
+  if (!Array.isArray(deliveries)) deliveries = [];
+
   var weekStart = mondayOfISO(date);
   var updatedAt = nowStamp();
 
   var sheet = getTab(TABS.REPORTS);
   var rows = readObjects(TABS.REPORTS);
 
-  var existing = {};
+  // Remove every existing row for this employee+date+restaurant (delete bottom-up so the
+  // remaining row numbers stay valid), then re-insert the current set of deliveries.
+  var toDelete = [];
   for (var i = 0; i < rows.length; i++) {
     if (String(rows[i].employee_id) === String(ctx.user.employee_id) &&
         normalizeIsoDate(rows[i].date) === date &&
         String(rows[i].restaurant) === restaurant) {
-      existing[String(rows[i].delivery_type)] = rows[i];
+      toDelete.push(rows[i].__row);
     }
   }
+  toDelete.sort(function(a, b) { return b - a; });
+  toDelete.forEach(function(rowNumber) { sheet.deleteRow(rowNumber); });
 
-  var types = Object.keys(counts);
-  for (var t = 0; t < types.length; t++) {
-    var type = types[t];
-    var value = toNumberOrNull(counts[type]);
-    if (value == null || value < 0) value = 0;
-    value = Math.round(value);
-
-    if (existing[type]) {
-      sheet.getRange(existing[type].__row, 8).setValue(value);
-      sheet.getRange(existing[type].__row, 9).setValue(updatedAt);
-    } else {
-      sheet.appendRow([genId('RPT'), ctx.user.employee_id, ctx.user.name, date, weekStart, restaurant, type, value, updatedAt]);
-    }
+  var saved = 0;
+  for (var d = 0; d < deliveries.length; d++) {
+    var type = String(deliveries[d].delivery_type || '').trim();
+    if (!type) continue;
+    var amount = toNumberOrNull(deliveries[d].amount);
+    if (amount == null || amount < 0) amount = 0;
+    amount = Math.round(amount * 100) / 100; // keep cents
+    sheet.appendRow([genId('RPT'), ctx.user.employee_id, ctx.user.name, date, weekStart, restaurant, type, amount, updatedAt]);
+    saved++;
   }
 
-  audit(ctx.user, 'daily_report_saved', 'report', ctx.user.employee_id + ':' + date, restaurant);
-  return ok({ date: date, restaurant: restaurant });
+  audit(ctx.user, 'daily_report_saved', 'report', ctx.user.employee_id + ':' + date, restaurant + ' · ' + saved + ' доставки');
+  return ok({ date: date, restaurant: restaurant, count: saved });
 }
 
 
