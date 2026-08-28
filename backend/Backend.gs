@@ -38,7 +38,7 @@ var SESSION_TTL_DAYS = 30;
 // Bump on every meaningful backend change. Visible via doGet (open the /exec URL in a
 // browser) so you can confirm which code the DEPLOYED web app is actually running —
 // Apps Script serves the last DEPLOYED VERSION, not merely the saved script.
-var BACKEND_VERSION = '2026-08-28-reports-value-based';
+var BACKEND_VERSION = '2026-08-28-reports-value-based-schedcache';
 
 // Each completed delivery order is worth this much toward the worker's weekly pay.
 var ORDER_RATE_EUR = 0.5;
@@ -52,9 +52,13 @@ var SAFETY_EQUIPMENT_FIELDS = [
 ];
 
 // Short server-side cache for the external schedule grid. Reading another Google Sheet
-// through Apps Script is slow, so cache the raw matrix briefly; background polls reuse
-// it, while an explicit admin refresh (params.refresh) or a source change bypasses it.
-var SCHEDULE_CACHE_TTL_SEC = 45;
+// through Apps Script is slow, so cache the raw matrix; background polls reuse it, while
+// an explicit admin refresh (params.refresh) or a source change bypasses it. The schedule
+// changes rarely (weekly), so a short TTL just re-ran the heavy external read for every
+// 45s auto-refresh of every user — a frequent source of 503s. A longer TTL means the
+// external sheet is read at most once per window; the manual "refresh" button stays
+// available for the rare mid-window change.
+var SCHEDULE_CACHE_TTL_SEC = 1800; // 30 min
 var SCHEDULE_CACHE_PREFIX = 'schedule_raw:';
 
 // Administration belongs to these real named users — there is no shared admin account.
@@ -1751,7 +1755,7 @@ function getScheduleRaw(params, ctx) {
     var cached = cache.get(cacheKey);
     if (cached) {
       try {
-        return JSON.parse(cached);
+        return JSON.parse(decodeScheduleCache(cached));
       } catch (e) {
         /* corrupt cache entry — fall through and re-read */
       }
@@ -1807,10 +1811,17 @@ function getScheduleRaw(params, ctx) {
         matrix
     });
 
-    // Cache the serialized result (CacheService caps values at 100KB — skip if larger).
+    // Cache the result. CacheService caps values at 100KB, and a full schedule grid can
+    // exceed that uncompressed — in which case it would NEVER cache and every request would
+    // re-open the heavy external sheet (a frequent source of 503s under load). Gzip the
+    // JSON (schedule text compresses well) so it fits and the external read runs at most
+    // once per TTL. Falls back to a plain write for small payloads.
     try {
       var serialized = JSON.stringify(result);
-      if (serialized.length < 95000) {
+      var encoded = encodeScheduleCache(serialized);
+      if (encoded && encoded.length < 95000) {
+        cache.put(cacheKey, encoded, SCHEDULE_CACHE_TTL_SEC);
+      } else if (serialized.length < 95000) {
         cache.put(cacheKey, serialized, SCHEDULE_CACHE_TTL_SEC);
       }
     } catch (e) {
@@ -1827,6 +1838,28 @@ function getScheduleRaw(params, ctx) {
       'schedule_load_failed'
     );
   }
+}
+
+
+// Gzip + base64 a string for CacheService storage, tagged so the reader knows to inflate.
+// Returns null if compression fails (caller then falls back to a plain write).
+function encodeScheduleCache(serialized) {
+  try {
+    var gz = Utilities.gzip(Utilities.newBlob(serialized, 'application/json')).getBytes();
+    return 'gz:' + Utilities.base64Encode(gz);
+  } catch (e) {
+    return null;
+  }
+}
+
+// Inverse of encodeScheduleCache. Plain (untagged) entries are returned as-is so older
+// cache writes and small plain payloads still decode.
+function decodeScheduleCache(cached) {
+  if (cached && cached.indexOf('gz:') === 0) {
+    var bytes = Utilities.base64Decode(cached.substring(3));
+    return Utilities.ungzip(Utilities.newBlob(bytes, 'application/x-gzip')).getDataAsString();
+  }
+  return cached;
 }
 
 

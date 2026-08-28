@@ -22,7 +22,7 @@ export function setApiUrl(url) {
 
 // Bump on each deploy so we can confirm which frontend build is actually live (shown
 // on the login screen and logged to the console at startup).
-export const APP_VERSION = 'ui-2026-08-28-reports-value-based'
+export const APP_VERSION = 'ui-2026-08-28-reports-value-based-retry'
 
 export const CONFIG = {
   appName: 'Delivery 2015',
@@ -67,7 +67,10 @@ export const CONFIG = {
   // failed cycles.
   net: {
     requestTimeoutMs: 20000,
-    retryBackoffMs: [1000, 2500], // first retry ~1s, second ~2.5s
+    // Apps Script sporadically returns 503 (Service Unavailable) under load — especially
+    // for the heavier schedule read. Give idempotent reads several, increasingly patient
+    // retries so a brief server-side blip recovers instead of surfacing as an error.
+    retryBackoffMs: [1000, 3000, 6000], // ~1s, ~3s, ~6s
     strongFailureThreshold: 3,
   },
 
