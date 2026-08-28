@@ -38,7 +38,7 @@ var SESSION_TTL_DAYS = 30;
 // Bump on every meaningful backend change. Visible via doGet (open the /exec URL in a
 // browser) so you can confirm which code the DEPLOYED web app is actually running —
 // Apps Script serves the last DEPLOYED VERSION, not merely the saved script.
-var BACKEND_VERSION = '2026-08-28-reports-value-based-schedcache';
+var BACKEND_VERSION = '2026-08-28-schedule-trim';
 
 // Each completed delivery order is worth this much toward the worker's weekly pay.
 var ORDER_RATE_EUR = 0.5;
@@ -1786,6 +1786,13 @@ function getScheduleRaw(params, ctx) {
         .getDataRange()
         .getDisplayValues();
 
+    // getDataRange() returns the whole USED range, which on a management schedule sheet is
+    // usually a small data block inside a large formatted-but-empty area. Serializing all
+    // of it produced a response too big for Apps Script to deliver (a ~4s build then a 503).
+    // Trim trailing empty rows/columns — lossless (empty cells carry no schedule data) and
+    // it keeps the top-left origin so the client parser is unaffected.
+    matrix = trimScheduleMatrix(matrix);
+
     var result = ok({
 
       configured: true,
@@ -1838,6 +1845,40 @@ function getScheduleRaw(params, ctx) {
       'schedule_load_failed'
     );
   }
+}
+
+
+// Drop trailing all-empty rows and columns from a 2D display-value grid, preserving the
+// top-left origin. Collapses the huge empty formatted areas that getDataRange() picks up
+// so the schedule response stays small enough for Apps Script to deliver.
+function trimScheduleMatrix(matrix) {
+  if (!matrix || !matrix.length) return matrix || [];
+
+  var nonEmpty = function(v) { return String(v == null ? '' : v).trim() !== ''; };
+
+  var lastRow = -1;
+  for (var r = 0; r < matrix.length; r++) {
+    var row = matrix[r] || [];
+    for (var c = 0; c < row.length; c++) {
+      if (nonEmpty(row[c])) { lastRow = r; break; }
+    }
+  }
+  if (lastRow < 0) return [];
+
+  var lastCol = -1;
+  for (var r2 = 0; r2 <= lastRow; r2++) {
+    var row2 = matrix[r2] || [];
+    for (var c2 = row2.length - 1; c2 > lastCol; c2--) {
+      if (nonEmpty(row2[c2])) { lastCol = c2; break; }
+    }
+  }
+  if (lastCol < 0) return [];
+
+  var out = [];
+  for (var r3 = 0; r3 <= lastRow; r3++) {
+    out.push((matrix[r3] || []).slice(0, lastCol + 1));
+  }
+  return out;
 }
 
 
