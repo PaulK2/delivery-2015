@@ -5,7 +5,7 @@ import { CONFIG } from '../config/index.js'
 import { getLocations, getSchedule } from '../services/schedule/schedule.js'
 import { useAutoRefresh } from '../hooks/useAutoRefresh.js'
 import { todayISO, weekdayIndex, weekdayBG, formatDateBG } from '../utils/datetime.js'
-import { NAV_ITEMS } from './nav.js'
+import { NAV_ITEMS, MORE_ITEM } from './nav.js'
 import OfflineBanner from './OfflineBanner.jsx'
 import ConnectionBanner from './ConnectionBanner.jsx'
 import GlobalSearch from './GlobalSearch.jsx'
@@ -18,6 +18,9 @@ const norm = (s) => (s || '').toString().trim().toLowerCase()
 export default function Layout() {
   const { user, isAdmin, logout } = useAuth()
   const items = NAV_ITEMS.filter((i) => !i.adminOnly || isAdmin)
+  // Bottom bar (mobile) stays short: the everyday screens + an "Още" button for the rest.
+  // The desktop side nav has room, so it lists every destination directly.
+  const primaryItems = items.filter((i) => i.group === 'primary')
 
   // The main (map) page shows the day/date on the map itself, so we hide the top-bar
   // date there to avoid displaying it twice; every other page shows it in the top bar.
@@ -148,9 +151,9 @@ export default function Layout() {
         </main>
       </div>
 
-      {/* Mobile bottom navigation */}
+      {/* Mobile bottom navigation — everyday screens + an "Още" button for the rest */}
       <nav className="bottom-nav" aria-label="Основна навигация">
-        {items.map((item) => (
+        {[...primaryItems, MORE_ITEM].map((item) => (
           <NavLink
             key={item.to}
             to={item.to}
@@ -162,7 +165,7 @@ export default function Layout() {
             <span className="bottom-nav__icon" aria-hidden="true">
               <Icon name={item.icon} size={22} />
             </span>
-            <span className="bottom-nav__label">{item.short || item.label}</span>
+            <span className="bottom-nav__label">{item.label}</span>
           </NavLink>
         ))}
       </nav>

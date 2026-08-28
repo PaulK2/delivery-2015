@@ -93,6 +93,14 @@ const ICONS = {
       <path d="M14 8l3 3v6a1.5 1.5 0 0 0 3 0V9.5L17 6.5" />
     </>
   ),
+  // Още — more (horizontal dots)
+  more: (
+    <>
+      <circle cx="5" cy="12" r="1.4" />
+      <circle cx="12" cy="12" r="1.4" />
+      <circle cx="19" cy="12" r="1.4" />
+    </>
+  ),
   // Администрация — sliders (settings)
   settings: (
     <>

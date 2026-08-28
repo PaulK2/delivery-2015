@@ -64,6 +64,9 @@ export default function SchedulePage() {
   // user's own shift today is opened once the schedule loads (see the seeding effect).
   const [openLocs, setOpenLocs] = useState(() => new Set())
   const seededLocs = useRef(false)
+  // 'mine' = just the logged-in user's shifts (simple list); 'all' = the full grid.
+  const [view, setView] = useState('mine')
+  const seededView = useRef(false)
 
   const toggleDay = (wd) =>
     setOpenDays((prev) => {
@@ -130,6 +133,36 @@ export default function SchedulePage() {
   const employees = useMemo(() => uniqSorted(data.entries.map((e) => e.employee_name)), [data])
   const locations = useMemo(() => uniqSorted(data.entries.map((e) => e.location_name)), [data])
 
+  // The logged-in user's own shifts, grouped by weekday (Monday-first): the simple
+  // default view. Empty when they have no shifts in the grid.
+  const myByWeekday = useMemo(() => {
+    if (!user) return []
+    const key = nameKey(user.name)
+    const mine = data.entries.filter((e) => nameKey(e.employee_name) === key)
+    const days = new Map()
+    for (const e of mine) {
+      if (!days.has(e.weekday)) days.set(e.weekday, [])
+      days.get(e.weekday).push(e)
+    }
+    const result = []
+    for (const wd of WEEK_ORDER) {
+      if (!days.has(wd)) continue
+      const list = days.get(wd).sort((a, b) => shiftSortRank(a.shift_type) - shiftSortRank(b.shift_type))
+      const dateISO = scheduleDate(wd, list[0].day_number)
+      result.push([wd, { dateISO, list }])
+    }
+    return result
+  }, [data.entries, user])
+
+  // Default to "my schedule" when the user actually has shifts; otherwise show the full
+  // grid (e.g. review-only admins). Seeded once, so toggling afterwards is respected.
+  useEffect(() => {
+    if (seededView.current) return
+    if (!data.entries.length) return
+    seededView.current = true
+    setView(myByWeekday.length ? 'mine' : 'all')
+  }, [data.entries, myByWeekday])
+
   const filtered = useMemo(() => {
     return data.entries.filter((e) => {
       if (filters.employee && e.employee_name !== filters.employee) return false
@@ -185,41 +218,63 @@ export default function SchedulePage() {
 
       {isAdmin ? <ScheduleSourceConfig onLoaded={load} /> : null}
 
-      <div className="filters">
-        <select
-          className="input input--sm"
-          value={filters.employee}
-          onChange={(e) => setFilters((f) => ({ ...f, employee: e.target.value }))}
-        >
-          <option value="">Всички служители</option>
-          {employees.map((n) => (
-            <option key={n} value={n}>
-              {n}
-            </option>
-          ))}
-        </select>
-        <select
-          className="input input--sm"
-          value={filters.location}
-          onChange={(e) => setFilters((f) => ({ ...f, location: e.target.value }))}
-        >
-          <option value="">Всички локации</option>
-          {locations.map((n) => (
-            <option key={n} value={n}>
-              {n}
-            </option>
-          ))}
-        </select>
-        <select
-          className="input input--sm"
-          value={filters.shift}
-          onChange={(e) => setFilters((f) => ({ ...f, shift: e.target.value }))}
-        >
-          <option value="">Всички смени</option>
-          <option value="full">{SHIFT_LABELS.full}</option>
-          <option value="evening">{SHIFT_LABELS.evening}</option>
-        </select>
-      </div>
+      {myByWeekday.length ? (
+        <div className="segmented">
+          <button
+            className={'segmented__btn' + (view === 'mine' ? ' segmented__btn--active' : '')}
+            onClick={() => setView('mine')}
+          >
+            Моят график
+          </button>
+          <button
+            className={'segmented__btn' + (view === 'all' ? ' segmented__btn--active' : '')}
+            onClick={() => setView('all')}
+          >
+            Цял график
+          </button>
+        </div>
+      ) : null}
+
+      {view === 'all' ? (
+        <details className="filters-details">
+          <summary className="filters-details__summary">Филтри</summary>
+          <div className="filters">
+            <select
+              className="input input--sm"
+              value={filters.employee}
+              onChange={(e) => setFilters((f) => ({ ...f, employee: e.target.value }))}
+            >
+              <option value="">Всички служители</option>
+              {employees.map((n) => (
+                <option key={n} value={n}>
+                  {n}
+                </option>
+              ))}
+            </select>
+            <select
+              className="input input--sm"
+              value={filters.location}
+              onChange={(e) => setFilters((f) => ({ ...f, location: e.target.value }))}
+            >
+              <option value="">Всички локации</option>
+              {locations.map((n) => (
+                <option key={n} value={n}>
+                  {n}
+                </option>
+              ))}
+            </select>
+            <select
+              className="input input--sm"
+              value={filters.shift}
+              onChange={(e) => setFilters((f) => ({ ...f, shift: e.target.value }))}
+            >
+              <option value="">Всички смени</option>
+              <option value="full">{SHIFT_LABELS.full}</option>
+              <option value="evening">{SHIFT_LABELS.evening}</option>
+            </select>
+          </div>
+        </details>
+      ) : null}
 
       {loading ? (
         <Spinner label="Зареждане на графика…" />
@@ -233,6 +288,30 @@ export default function SchedulePage() {
       ) : !data.configured ? (
         <div className="empty-state">
           Графикът не е конфигуриран. {isAdmin ? 'Задайте Google Sheet връзка по-горе.' : 'Свържете се с администратор.'}
+        </div>
+      ) : view === 'mine' ? (
+        <div className="schedule-mine">
+          {myByWeekday.map(([wd, { dateISO, list }]) => (
+            <section key={wd} className="mine-day">
+              <div className="mine-day__head">
+                <span className="mine-day__weekday">{weekdayNameByIndex(wd)}</span>
+                {dateISO ? <span className="mine-day__date">{formatDateBG(dateISO)}</span> : null}
+              </div>
+              <ul className="schedule-list">
+                {list.map((e) => (
+                  <li key={e.schedule_id} className={'schedule-item schedule-item--' + e.shift_type}>
+                    <span className="schedule-item__person">{e.location_name}</span>
+                    <span className="schedule-item__shift">{SHIFT_LABELS[e.shift_type]}</span>
+                    <ScheduleCar rawCar={e.car} known={knownCars} />
+                    {formatPayment(e.payment) ? (
+                      <span className="schedule-item__pay">{formatPayment(e.payment)}</span>
+                    ) : null}
+                    <span className="schedule-item__hours">{shiftHours(e.shift_type)}</span>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          ))}
         </div>
       ) : byWeekday.length === 0 ? (
         <div className="empty-state">Няма записи в графика за избраните филтри.</div>

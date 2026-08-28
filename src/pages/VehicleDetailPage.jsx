@@ -363,7 +363,7 @@ export default function VehicleDetailPage() {
           </p>
         </div>
       ) : (
-      <div className="vehicle-actions">
+      <div className="vehicle-actions vehicle-actions--bar">
         {canTake ? (
           <button className="btn btn--primary btn--block" onClick={onTake} disabled={acting}>
             {acting ? 'Обработва се…' : 'Вземи автомобила'}
@@ -461,19 +461,18 @@ export default function VehicleDetailPage() {
 
       {/* Odometer & oil change — not applicable to the own car */}
       {!own ? (
-        <section className="detail-section">
-          <div className="detail-section__head">
-            <h2 className="detail-section__title">Километраж и масло</h2>
-            {isAdmin ? (
-              <button
-                className="btn btn--ghost btn--sm"
-                onClick={() => setShowOil(true)}
-                disabled={acting}
-              >
-                Отбележи смяна на масло
-              </button>
-            ) : null}
-          </div>
+        <details className="detail-section detail-section--acc">
+          <summary className="detail-section__summary">Километраж и масло</summary>
+          <div className="detail-section__acc-body">
+          {isAdmin ? (
+            <button
+              className="btn btn--ghost btn--sm"
+              onClick={() => setShowOil(true)}
+              disabled={acting}
+            >
+              Отбележи смяна на масло
+            </button>
+          ) : null}
 
           {oil.due ? (
             <div className="banner banner--warn" role="status">
@@ -503,7 +502,8 @@ export default function VehicleDetailPage() {
               </div>
             </div>
           </div>
-        </section>
+          </div>
+        </details>
       ) : null}
 
       {/* Documents & deadlines (spec §46–§50) — not applicable to the own car */}
@@ -518,20 +518,23 @@ export default function VehicleDetailPage() {
 
       {/* Usage history */}
       {!own ? (
-      <section className="detail-section">
-        <h2 className="detail-section__title">История на ползване</h2>
+      <details className="detail-section detail-section--acc">
+        <summary className="detail-section__summary">История на ползване</summary>
+        <div className="detail-section__acc-body">
         {history === null ? (
           <Spinner label="Зареждане на историята…" />
         ) : (
           <UsageHistoryList history={history} />
         )}
-      </section>
+        </div>
+      </details>
       ) : null}
 
       {/* Repair history (spec §44) */}
       {!own ? (
-      <section className="detail-section">
-        <h2 className="detail-section__title">История на ремонти</h2>
+      <details className="detail-section detail-section--acc">
+        <summary className="detail-section__summary">История на ремонти</summary>
+        <div className="detail-section__acc-body">
         {repairs.length === 0 ? (
           <div className="empty-state empty-state--sm">Няма извършени ремонти.</div>
         ) : (
@@ -558,7 +561,8 @@ export default function VehicleDetailPage() {
             ))}
           </ul>
         )}
-      </section>
+        </div>
+      </details>
       ) : null}
 
       {showRelease ? (

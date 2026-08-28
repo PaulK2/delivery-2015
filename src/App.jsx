@@ -14,8 +14,8 @@ const VehicleDetailPage = lazy(() => import('./pages/VehicleDetailPage.jsx'))
 const AvailabilityPage = lazy(() => import('./pages/AvailabilityPage.jsx'))
 const MaintenancePage = lazy(() => import('./pages/MaintenancePage.jsx'))
 const AdminPage = lazy(() => import('./pages/AdminPage.jsx'))
-const OrdersPage = lazy(() => import('./pages/OrdersPage.jsx'))
-const ReportPage = lazy(() => import('./pages/ReportPage.jsx'))
+const DayPage = lazy(() => import('./pages/DayPage.jsx'))
+const MorePage = lazy(() => import('./pages/MorePage.jsx'))
 
 function RequireAuth({ children }) {
   const { isAuthenticated, loading } = useAuth()
@@ -75,21 +75,24 @@ export default function App() {
           }
         />
         <Route
-          path="/orders"
+          path="/day"
           element={
             <Suspense fallback={<PageLoading />}>
-              <OrdersPage />
+              <DayPage />
             </Suspense>
           }
         />
         <Route
-          path="/report"
+          path="/more"
           element={
             <Suspense fallback={<PageLoading />}>
-              <ReportPage />
+              <MorePage />
             </Suspense>
           }
         />
+        {/* Old separate screens are now merged into "Моят ден" */}
+        <Route path="/orders" element={<Navigate to="/day" replace />} />
+        <Route path="/report" element={<Navigate to="/day" replace />} />
         <Route
           path="/vehicles"
           element={

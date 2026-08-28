@@ -7,9 +7,13 @@ import App from './App.jsx'
 import { APP_VERSION } from './config/index.js'
 import { AuthProvider } from './context/AuthContext.jsx'
 import { ToastProvider } from './context/ToastContext.jsx'
+import { applyFontScale } from './utils/uiPrefs.js'
 
 // Printed at startup so the running frontend build is verifiable from the console.
 console.log('FleetView frontend build:', APP_VERSION)
+
+// Apply the saved "large text" preference before first paint (no flash).
+applyFontScale()
 
 // Register the PWA service worker in production only (spec §87).
 if ('serviceWorker' in navigator && import.meta.env.PROD) {

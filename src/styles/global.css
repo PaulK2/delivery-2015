@@ -69,8 +69,16 @@ body {
   color: var(--text);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  font-size: 15px;
-  line-height: 1.45;
+  font-size: 16px;
+  line-height: 1.5;
+}
+
+/* Accessibility: "Голям текст" — uniformly enlarges the whole app ~15% (toggle on the
+   More page). The app uses fixed px sizes throughout, so `zoom` is the reliable way to
+   scale everything (text, controls, spacing) at once. Only size changes; colours and
+   icons are untouched. */
+html.font-lg body {
+  zoom: 1.15;
 }
 
 button {
@@ -104,7 +112,7 @@ button {
   color: var(--text);
   transition: background 0.12s ease, border-color 0.12s ease, opacity 0.12s ease,
     transform 0.08s ease, box-shadow 0.12s ease;
-  min-height: 40px; /* comfortable touch target */
+  min-height: 44px; /* comfortable touch target */
 }
 /* Tactile press feedback (spec §47/§48 — subtle, no bounce). */
 .btn:active:not(:disabled) {
@@ -160,8 +168,8 @@ button {
   margin: 0;
 }
 .btn--sm {
-  padding: 6px 12px;
-  min-height: 36px;
+  padding: 7px 13px;
+  min-height: 40px;
   font-size: 14px;
 }
 .btn--block {
@@ -3228,3 +3236,323 @@ input.report-row__input { min-height: 40px; }
 .fuel-item__amount { font-weight: 800; align-self: center; }
 .usage-item__fuel { font-size: 13px; color: var(--text-2); margin-top: 4px; }
 .usage-item__missing { font-size: 13px; color: var(--danger); margin-top: 4px; font-weight: 600; }
+
+/* ============================================================================
+   Simplification pass — clearer guidance for everyday (incl. elderly) users.
+   Structure / layout / sizing only. No new colours; existing tokens reused.
+   ============================================================================ */
+
+/* "Днес" card on Home — the plain-language answer to "where do I work + car". */
+.today-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--accent);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  margin-bottom: 12px;
+  box-shadow: var(--shadow);
+}
+.today-card--off {
+  border-left-color: var(--border);
+}
+.today-card__label {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-2);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  margin-bottom: 6px;
+}
+.today-card__main {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 12px;
+}
+.today-card__loc {
+  font-size: 20px;
+  font-weight: 800;
+}
+.today-card__shift {
+  font-size: 15px;
+  color: var(--text-2);
+  font-weight: 600;
+}
+.today-card__car {
+  margin-top: 6px;
+  font-size: 15px;
+  font-weight: 600;
+}
+.today-card__actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+  flex-wrap: wrap;
+}
+.today-card__none {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-2);
+}
+
+/* Consistent period navigator (day/week) used across screens. */
+.period-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 6px 8px;
+  margin-bottom: 14px;
+}
+.period-nav__arrow {
+  flex: 0 0 auto;
+  width: 48px;
+  min-height: 44px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+}
+.period-nav__arrow:hover {
+  background: var(--surface-2);
+}
+.period-nav__center {
+  flex: 1 1 auto;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+.period-nav__label {
+  font-weight: 800;
+  font-size: 16px;
+}
+.period-nav__today {
+  border: none;
+  background: var(--accent-bg);
+  color: var(--accent-dark);
+  border-radius: var(--radius-pill);
+  padding: 2px 12px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+/* Merged "Моят ден" — order count field + auto/manual sync note. */
+.report-count-input {
+  max-width: 120px;
+  text-align: right;
+  font-weight: 800;
+}
+.report-count-note {
+  font-size: 13px;
+  color: var(--muted);
+  margin: 2px 0 8px;
+}
+.report-sync {
+  border: none;
+  background: var(--accent-bg);
+  color: var(--accent-dark);
+  border-radius: var(--radius-pill);
+  padding: 4px 12px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  margin: 2px 0 10px;
+}
+
+.empty-state__hint {
+  margin-top: 6px;
+  font-size: 14px;
+  color: var(--muted);
+  font-weight: 500;
+}
+
+/* Schedule: collapsible filters + simple "my schedule" list. */
+.filters-details {
+  margin-bottom: 12px;
+}
+.filters-details__summary {
+  cursor: pointer;
+  font-weight: 700;
+  color: var(--text-2);
+  padding: 8px 4px;
+  list-style: none;
+}
+.filters-details__summary::-webkit-details-marker {
+  display: none;
+}
+.filters-details__summary::before {
+  content: '▸ ';
+}
+.filters-details[open] .filters-details__summary::before {
+  content: '▾ ';
+}
+.schedule-mine {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.mine-day {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 10px 12px;
+  box-shadow: var(--shadow);
+}
+.mine-day__head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+.mine-day__weekday {
+  font-weight: 800;
+  font-size: 16px;
+}
+.mine-day__date {
+  color: var(--text-2);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+/* Collapsible reference sections on the vehicle detail page. */
+.detail-section--acc {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0;
+  margin-bottom: 14px;
+  box-shadow: var(--shadow);
+}
+.detail-section__summary {
+  cursor: pointer;
+  font-weight: 800;
+  font-size: 16px;
+  padding: 14px 16px;
+  list-style: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.detail-section__summary::-webkit-details-marker {
+  display: none;
+}
+.detail-section__summary::after {
+  content: '▸';
+  color: var(--muted);
+  font-size: 14px;
+}
+.detail-section--acc[open] .detail-section__summary::after {
+  content: '▾';
+}
+.detail-section__acc-body {
+  padding: 0 16px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* Sticky primary action bar on the vehicle detail page. */
+.vehicle-actions--bar {
+  position: sticky;
+  top: 8px;
+  z-index: 5;
+  background: var(--bg);
+  padding: 8px;
+  margin: 0 -8px 14px;
+  border-radius: var(--radius);
+}
+
+/* "Още" page — big, clearly-labelled destination buttons + settings. */
+.more-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+.more-list__item {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+  text-decoration: none;
+  color: var(--text);
+  font-weight: 700;
+  font-size: 17px;
+  box-shadow: var(--shadow);
+}
+.more-list__item:hover {
+  background: var(--surface-2);
+}
+.more-list__icon {
+  flex: 0 0 auto;
+  color: var(--accent);
+  display: flex;
+}
+.more-list__label {
+  flex: 1 1 auto;
+}
+.more-list__chev {
+  color: var(--muted);
+  font-size: 22px;
+}
+.toggle-row {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  cursor: pointer;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text);
+}
+.toggle-row__state {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--muted);
+}
+.toggle-row--on .toggle-row__state {
+  color: var(--accent-dark);
+}
+.more-page__hint {
+  font-size: 13px;
+  color: var(--muted);
+  margin: 6px 2px 0;
+}
+.help-steps {
+  margin: 0;
+  padding-left: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 15px;
+  line-height: 1.5;
+}
+.help-steps li {
+  padding-left: 4px;
+}
+.intro-lead {
+  font-size: 15px;
+  margin: 0 0 12px;
+}

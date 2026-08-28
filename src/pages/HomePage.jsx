@@ -1,8 +1,12 @@
 import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
-import { useOutletContext } from 'react-router-dom'
+import { createPortal } from 'react-dom'
+import { Link, useOutletContext } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext.jsx'
 import { todayISO, shiftISO, weekdayBG, formatDateBG, scheduleEntriesForDate } from '../utils/datetime.js'
+import { SHIFT_LABELS, shiftHours } from '../utils/shifts.js'
+import { hasSeenIntro, markIntroSeen } from '../utils/uiPrefs.js'
 import LocationDetailPanel from '../components/LocationDetailPanel.jsx'
+import Modal from '../components/Modal.jsx'
 import Icon from '../components/Icon.jsx'
 import Spinner from '../components/Spinner.jsx'
 
@@ -20,6 +24,12 @@ export default function HomePage() {
   const { user } = useAuth()
   const [date, setDate] = useState(todayISO())
   const [selectedId, setSelectedId] = useState(null)
+  const [showIntro, setShowIntro] = useState(() => !hasSeenIntro())
+
+  function dismissIntro() {
+    markIntroSeen()
+    setShowIntro(false)
+  }
 
   const isToday = date === todayISO()
 
@@ -59,15 +69,20 @@ export default function HomePage() {
 
   const selectedLocation = locations.find((l) => l.location_id === selectedId) || null
 
-  // The logged-in user's restaurant for the currently VIEWED date (not just today):
-  // matched by name against that day's schedule entries.
-  const myShiftLocation = useMemo(() => {
+  // The logged-in user's schedule entry for the currently VIEWED date (not just today).
+  const myShiftEntry = useMemo(() => {
     if (!user) return null
     const key = nameKey(user.name)
-    const mine = entriesForDate.find((e) => nameKey(e.employee_name) === key)
-    if (!mine) return null
-    return locations.find((l) => norm(l.name) === norm(mine.location_name)) || null
-  }, [entriesForDate, locations, user])
+    return entriesForDate.find((e) => nameKey(e.employee_name) === key) || null
+  }, [entriesForDate, user])
+
+  // …and the matching restaurant on the map.
+  const myShiftLocation = useMemo(() => {
+    if (!myShiftEntry) return null
+    return locations.find((l) => norm(l.name) === norm(myShiftEntry.location_name)) || null
+  }, [myShiftEntry, locations])
+
+  const isTodayView = date === todayISO()
 
   // As the user cycles through days, follow their restaurant for that day: select it so
   // the panel below the map shows that day's schedule for it (not only the map zoom).
@@ -88,6 +103,36 @@ export default function HomePage() {
 
   return (
     <div className="home">
+      {/* Plain-language answer to "where do I work and with what car" for the viewed day. */}
+      <div className={'today-card' + (myShiftEntry ? '' : ' today-card--off')}>
+        <div className="today-card__label">
+          {isTodayView ? 'Днес' : weekdayBG(date)} · {formatDateBG(date)}
+        </div>
+        {myShiftEntry ? (
+          <>
+            <div className="today-card__main">
+              <span className="today-card__loc">📍 {myShiftEntry.location_name}</span>
+              <span className="today-card__shift">
+                {SHIFT_LABELS[myShiftEntry.shift_type] || ''}
+                {shiftHours(myShiftEntry.shift_type) ? ` · ${shiftHours(myShiftEntry.shift_type)}` : ''}
+              </span>
+            </div>
+            {myShiftEntry.car ? (
+              <div className="today-card__car">🚗 Кола: {myShiftEntry.car}</div>
+            ) : null}
+            <div className="today-card__actions">
+              <Link to="/schedule" className="btn btn--ghost btn--sm">Виж графика</Link>
+              <Link to="/day" className="btn btn--primary btn--sm">Моят ден</Link>
+            </div>
+          </>
+        ) : (
+          <div className="today-card__none">
+            <span>{isTodayView ? 'Днес нямате смяна.' : 'Нямате смяна за този ден.'}</span>
+            <Link to="/schedule" className="btn btn--ghost btn--sm">Виж графика</Link>
+          </div>
+        )}
+      </div>
+
       {error ? (
         <div className="banner banner--error" role="alert">
           {error}
@@ -162,6 +207,34 @@ export default function HomePage() {
           )}
         </div>
       </div>
+
+      {showIntro
+        ? // Portalled to <body> so the modal is viewport-centred, not affected by the
+          // page-entrance transform on `.home` (which otherwise offsets fixed children).
+          createPortal(
+            <Modal
+              title="Добре дошли 👋"
+              onClose={dismissIntro}
+              footer={
+                <button className="btn btn--primary btn--block" onClick={dismissIntro}>
+                  Разбрах
+                </button>
+              }
+            >
+              <p className="intro-lead">Приложението има 3 основни стъпки:</p>
+              <ol className="help-steps">
+                <li><strong>Начало</strong> — вижте къде работите днес и с коя кола.</li>
+                <li><strong>Автомобили</strong> — вземете колата в началото и я освободете накрая.</li>
+                <li><strong>Моят ден</strong> — въведете доставките си след смяната.</li>
+              </ol>
+              <p className="intro-lead">
+                Останалото е в бутона <strong>Още</strong> долу. Там може да включите и{' '}
+                <strong>Голям текст</strong>.
+              </p>
+            </Modal>,
+            document.body
+          )
+        : null}
     </div>
   )
 }
