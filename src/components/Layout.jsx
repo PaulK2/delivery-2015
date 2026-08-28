@@ -127,9 +127,10 @@ export default function Layout() {
       <ConnectionBanner />
 
       <div className="app-body">
-        {/* Desktop side navigation */}
+        {/* Desktop side navigation — same everyday screens + an "Още" entry that opens
+            the More page (settings, secondary destinations), so it's reachable here too. */}
         <nav className="side-nav" aria-label="Основна навигация">
-          {items.map((item) => (
+          {[...primaryItems, MORE_ITEM].map((item) => (
             <NavLink
               key={item.to}
               to={item.to}
