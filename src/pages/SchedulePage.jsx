@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { getSchedule } from '../services/schedule/schedule.js'
 import { getCars } from '../services/fleet/fleet.js'
@@ -8,6 +8,7 @@ import {
   weekdayIndex,
   todayISO,
   scheduleDate,
+  scheduleEntriesForDate,
   formatDateBG,
 } from '../utils/datetime.js'
 import { shiftHours, shiftSortRank, formatPayment, SHIFT_LABELS } from '../utils/shifts.js'
@@ -18,6 +19,11 @@ import Spinner from '../components/Spinner.jsx'
 import ScheduleSourceConfig from '../components/ScheduleSourceConfig.jsx'
 
 const uniqSorted = (arr) => [...new Set(arr.filter(Boolean))].sort((a, b) => a.localeCompare(b, 'bg'))
+
+// Case- and space-insensitive name key (so "Иван  Петров" == "иванпетров").
+const nameKey = (s) => String(s || '').toLowerCase().replace(/\s+/g, '')
+// A location dropdown is keyed by its day + name (same restaurant appears on many days).
+const locKey = (wd, locName) => `${wd}::${locName}`
 
 // The car note on a schedule row: extract just the plate, link it to the car's card
 // when it maps to a real vehicle, and auto-complete truncated plates. Renders nothing
@@ -46,7 +52,7 @@ function ScheduleCar({ rawCar, known }) {
 }
 
 export default function SchedulePage() {
-  const { isAdmin } = useAuth()
+  const { isAdmin, user } = useAuth()
   const [data, setData] = useState({ entries: [], locationNames: [], configured: true, sheetName: '' })
   const [cars, setCars] = useState([])
   const [loading, setLoading] = useState(true)
@@ -54,6 +60,10 @@ export default function SchedulePage() {
   const [filters, setFilters] = useState({ employee: '', location: '', shift: '' })
   // Which day sections are expanded. Start with today's weekday open; the rest collapse.
   const [openDays, setOpenDays] = useState(() => new Set([weekdayIndex(todayISO())]))
+  // Which restaurant dropdowns are expanded. All start collapsed; the location of the
+  // user's own shift today is opened once the schedule loads (see the seeding effect).
+  const [openLocs, setOpenLocs] = useState(() => new Set())
+  const seededLocs = useRef(false)
 
   const toggleDay = (wd) =>
     setOpenDays((prev) => {
@@ -61,6 +71,33 @@ export default function SchedulePage() {
       next.has(wd) ? next.delete(wd) : next.add(wd)
       return next
     })
+
+  const toggleLoc = (key) =>
+    setOpenLocs((prev) => {
+      const next = new Set(prev)
+      next.has(key) ? next.delete(key) : next.add(key)
+      return next
+    })
+
+  // The dropdown to open by default: the restaurant where the logged-in user has a shift
+  // TODAY. Null when they have no shift today → every dropdown stays collapsed.
+  const defaultOpenLoc = useMemo(() => {
+    if (!user) return null
+    const today = todayISO()
+    const mine = scheduleEntriesForDate(data.entries, today).find(
+      (e) => nameKey(e.employee_name) === nameKey(user.name)
+    )
+    return mine ? locKey(weekdayIndex(today), mine.location_name) : null
+  }, [data.entries, user])
+
+  // Seed the default-open dropdown once, when the schedule first arrives. Guarded so a
+  // manual refresh (or the user toggling dropdowns) never re-collapses their view.
+  useEffect(() => {
+    if (seededLocs.current) return
+    if (!data.entries.length) return
+    seededLocs.current = true
+    setOpenLocs(defaultOpenLoc ? new Set([defaultOpenLoc]) : new Set())
+  }, [data.entries, defaultOpenLoc])
 
   async function load() {
     setLoading(true)
@@ -223,30 +260,54 @@ export default function SchedulePage() {
                 </button>
 
                 {isOpen
-                  ? locList.map(([locName, entries]) => (
-                      <div key={locName} className="schedule-loc">
-                        <h3 className="schedule-loc__head">
-                          <span className="schedule-loc__name">{locName}</span>
-                          <span className="schedule-loc__count">{entries.length}</span>
-                        </h3>
-                        <ul className="schedule-list">
-                          {entries.map((e) => (
-                            <li
-                              key={e.schedule_id}
-                              className={'schedule-item schedule-item--' + e.shift_type}
+                  ? locList.map(([locName, entries]) => {
+                      const key = locKey(wd, locName)
+                      // Open if the user expanded it, or a location filter is pinning it.
+                      const locOpen = openLocs.has(key) || filters.location === locName
+                      return (
+                        <div
+                          key={locName}
+                          className={'schedule-loc' + (locOpen ? ' schedule-loc--open' : '')}
+                        >
+                          <button
+                            type="button"
+                            className="schedule-loc__head"
+                            aria-expanded={locOpen}
+                            onClick={() => toggleLoc(key)}
+                          >
+                            <span
+                              className={
+                                'schedule-loc__chevron' +
+                                (locOpen ? ' schedule-loc__chevron--open' : '')
+                              }
+                              aria-hidden="true"
                             >
-                              <span className="schedule-item__person">{e.employee_name}</span>
-                              <span className="schedule-item__shift">{SHIFT_LABELS[e.shift_type]}</span>
-                              <ScheduleCar rawCar={e.car} known={knownCars} />
-                              {formatPayment(e.payment) ? (
-                                <span className="schedule-item__pay">{formatPayment(e.payment)}</span>
-                              ) : null}
-                              <span className="schedule-item__hours">{shiftHours(e.shift_type)}</span>
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    ))
+                              ▸
+                            </span>
+                            <span className="schedule-loc__name">{locName}</span>
+                            <span className="schedule-loc__count">{entries.length}</span>
+                          </button>
+                          {locOpen ? (
+                            <ul className="schedule-list">
+                              {entries.map((e) => (
+                                <li
+                                  key={e.schedule_id}
+                                  className={'schedule-item schedule-item--' + e.shift_type}
+                                >
+                                  <span className="schedule-item__person">{e.employee_name}</span>
+                                  <span className="schedule-item__shift">{SHIFT_LABELS[e.shift_type]}</span>
+                                  <ScheduleCar rawCar={e.car} known={knownCars} />
+                                  {formatPayment(e.payment) ? (
+                                    <span className="schedule-item__pay">{formatPayment(e.payment)}</span>
+                                  ) : null}
+                                  <span className="schedule-item__hours">{shiftHours(e.shift_type)}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          ) : null}
+                        </div>
+                      )
+                    })
                   : null}
               </section>
             )

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet'
+import { MapContainer, TileLayer, Marker, Popup, useMap, useMapEvents } from 'react-leaflet'
 import L from 'leaflet'
 import { CONFIG } from '../config/index.js'
 
@@ -30,9 +30,19 @@ function DragGate({ mobile, active }) {
   return null
 }
 
-// Pans/zooms the map to a focus point (the user's restaurant for the viewed day).
-// When focus is cleared — the user has no shift that day — the map flies back to the
-// default zoomed-out view so it always reflects the currently viewed date.
+// Zooms the map OUT to the default view when the user taps empty map (not a marker).
+// Leaflet fires the map's `click` only for background taps — marker taps are handled by
+// the marker's own handler and don't bubble here — so a click here means "deselect".
+function BackgroundClick({ onSelect }) {
+  useMapEvents({
+    click: () => onSelect(null),
+  })
+  return null
+}
+
+// Pans/zooms the map to a focus point (the selected restaurant — the user's shift for the
+// viewed day, or any marker they tap). When focus is cleared — no shift that day, or the
+// user tapped empty map — it flies back to the default zoomed-out view.
 function FocusController({ focus, zoom, defaultCenter, defaultZoom }) {
   const map = useMap()
   const lat = focus?.[0]
@@ -64,7 +74,7 @@ function pinIcon(count, selected) {
   })
 }
 
-export default function SofiaMap({ locations, countsByLocation, selectedId, onSelect, focus }) {
+export default function SofiaMap({ locations, countsByLocation, selectedId, onSelect }) {
   const center = [CONFIG.map.defaultLat, CONFIG.map.defaultLng]
   const isMobile = useIsMobile()
   const [dragActive, setDragActive] = useState(false)
@@ -79,6 +89,14 @@ export default function SofiaMap({ locations, countsByLocation, selectedId, onSe
     [locations]
   )
 
+  // The map zooms in on whichever location is selected (a tapped marker, or the user's
+  // shift for the viewed day — the parent keeps selectedId in sync). Nothing selected →
+  // the map stays/returns zoomed out.
+  const focus = useMemo(() => {
+    const sel = markerLocations.find((loc) => loc.location_id === selectedId)
+    return sel ? [Number(sel.latitude), Number(sel.longitude)] : null
+  }, [markerLocations, selectedId])
+
   return (
     <div className="sofia-map-wrap">
       <MapContainer
@@ -91,6 +109,7 @@ export default function SofiaMap({ locations, countsByLocation, selectedId, onSe
       >
         <TileLayer url={CONFIG.map.tileUrl} attribution={CONFIG.map.tileAttribution} />
         <DragGate mobile={isMobile} active={dragActive} />
+        <BackgroundClick onSelect={onSelect} />
         <FocusController
           focus={focus}
           zoom={CONFIG.map.focusZoom || 15}

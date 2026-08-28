@@ -17,6 +17,7 @@ export default function LoginPage() {
   const [error, setError] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [loadError, setLoadError] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
 
   const MIN_PASSWORD_LEN = 6
 
@@ -123,28 +124,52 @@ export default function LoginPage() {
 
                 <label className="field">
                   <span className="field__label">{firstTime ? 'Нова парола' : 'Парола'}</span>
-                  <input
-                    className="input"
-                    type="password"
-                    autoComplete={firstTime ? 'new-password' : 'current-password'}
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder="••••••"
-                    autoFocus
-                  />
+                  <div className="password-field">
+                    <input
+                      className="input password-field__input"
+                      type={showPassword ? 'text' : 'password'}
+                      autoComplete={firstTime ? 'new-password' : 'current-password'}
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      placeholder="••••••"
+                      autoFocus
+                    />
+                    <button
+                      type="button"
+                      className="password-field__toggle"
+                      onClick={() => setShowPassword((s) => !s)}
+                      aria-label={showPassword ? 'Скрий паролата' : 'Покажи паролата'}
+                      aria-pressed={showPassword}
+                      tabIndex={-1}
+                    >
+                      <Icon name={showPassword ? 'eye-off' : 'eye'} size={20} />
+                    </button>
+                  </div>
                 </label>
 
                 {firstTime ? (
                   <label className="field">
                     <span className="field__label">Потвърдете паролата</span>
-                    <input
-                      className="input"
-                      type="password"
-                      autoComplete="new-password"
-                      value={confirm}
-                      onChange={(e) => setConfirm(e.target.value)}
-                      placeholder="••••••"
-                    />
+                    <div className="password-field">
+                      <input
+                        className="input password-field__input"
+                        type={showPassword ? 'text' : 'password'}
+                        autoComplete="new-password"
+                        value={confirm}
+                        onChange={(e) => setConfirm(e.target.value)}
+                        placeholder="••••••"
+                      />
+                      <button
+                        type="button"
+                        className="password-field__toggle"
+                        onClick={() => setShowPassword((s) => !s)}
+                        aria-label={showPassword ? 'Скрий паролата' : 'Покажи паролата'}
+                        aria-pressed={showPassword}
+                        tabIndex={-1}
+                      >
+                        <Icon name={showPassword ? 'eye-off' : 'eye'} size={20} />
+                      </button>
+                    </div>
                   </label>
                 ) : null}
               </>

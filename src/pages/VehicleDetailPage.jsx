@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import {
   getCar,
+  getCars,
   takeCar,
   releaseCar,
   getCarUsageHistory,
@@ -22,6 +23,7 @@ import ReleaseCarModal from '../components/ReleaseCarModal.jsx'
 import OilChangeModal from '../components/OilChangeModal.jsx'
 import ReportIssueModal from '../components/ReportIssueModal.jsx'
 import ResolveIssueModal from '../components/ResolveIssueModal.jsx'
+import ConfirmModal from '../components/ConfirmModal.jsx'
 import UsageHistoryList from '../components/UsageHistoryList.jsx'
 import DocumentsSection from '../components/DocumentsSection.jsx'
 import DocumentModal from '../components/DocumentModal.jsx'
@@ -44,6 +46,7 @@ export default function VehicleDetailPage() {
   const [showReport, setShowReport] = useState(false)
   const [resolving, setResolving] = useState(null) // issue being resolved, or null
   const [docModal, setDocModal] = useState(null) // { doc } to edit/add, or null closed
+  const [confirmTake, setConfirmTake] = useState(null) // { plate } when taking a 2nd car
 
   const loadCar = useCallback(async () => {
     const [c, m, d] = await Promise.all([
@@ -96,7 +99,40 @@ export default function VehicleDetailPage() {
     [maintenance]
   )
 
+  // Taking a car: a driver may hold at most 2 at once, and taking a 2nd requires
+  // confirmation (spec — max 2 cars). Check what the user already drives, then either
+  // block (already at 2), ask to confirm (has 1), or take straight away (has none).
   async function onTake() {
+    setActing(true)
+    try {
+      const all = await getCars({ force: true })
+      const mine = all.filter(
+        (c) =>
+          c.status === 'in_use' &&
+          c.current_driver_id &&
+          String(c.current_driver_id) === String(user?.employee_id)
+      )
+      if (mine.length >= 2) {
+        showToast(
+          'Достигнат е лимитът от 2 автомобила. Освободете автомобил, преди да вземете нов.',
+          'error'
+        )
+        return
+      }
+      if (mine.length === 1) {
+        setConfirmTake({ plate: mine[0].registration })
+        return
+      }
+    } catch {
+      // Couldn't check the fleet — fall through and let the backend enforce the limit.
+    } finally {
+      setActing(false)
+    }
+    await doTake()
+  }
+
+  async function doTake() {
+    setConfirmTake(null)
     setActing(true)
     try {
       await takeCar(carId)
@@ -473,6 +509,19 @@ export default function VehicleDetailPage() {
           onClose={() => setDocModal(null)}
           onSubmit={onSaveDocument}
           submitting={acting}
+        />
+      ) : null}
+      {confirmTake ? (
+        <ConfirmModal
+          title="Вземане на втори автомобил"
+          message={`В момента управлявате автомобил ${confirmTake.plate}. Сигурни ли сте, че искате да вземете и този автомобил?`}
+          confirmLabel="Да, вземи"
+          cancelLabel="Отказ"
+          busyLabel="Обработва се…"
+          danger={false}
+          busy={acting}
+          onConfirm={doTake}
+          onClose={() => setConfirmTake(null)}
         />
       ) : null}
     </div>

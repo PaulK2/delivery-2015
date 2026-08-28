@@ -69,13 +69,6 @@ export default function HomePage() {
     return locations.find((l) => norm(l.name) === norm(mine.location_name)) || null
   }, [entriesForDate, locations, user])
 
-  // Focus the map on the viewed day's restaurant (if it has coordinates). When the
-  // user has no shift that day, focus is null and the map returns to the zoomed-out view.
-  const focus =
-    myShiftLocation && myShiftLocation.latitude != null
-      ? [Number(myShiftLocation.latitude), Number(myShiftLocation.longitude)]
-      : null
-
   // As the user cycles through days, follow their restaurant for that day: select it so
   // the panel below the map shows that day's schedule for it (not only the map zoom).
   // A manual marker click still overrides within the same day (this only re-runs when
@@ -145,7 +138,6 @@ export default function HomePage() {
               countsByLocation={countsByLocation}
               selectedId={selectedId}
               onSelect={setSelectedId}
-              focus={focus}
             />
           </Suspense>
         </div>

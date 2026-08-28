@@ -61,49 +61,49 @@ export default function AdminDashboard() {
           label="Свободни"
           value={d.free}
           tone="ok"
-          desc="Автомобили, които са свободни и могат да бъдат поети в момента."
+          desc="Налични автомобили"
         />
         <Stat
           label="В движение"
           value={d.inUse}
           tone="accent"
-          desc="Автомобили, които в момента се управляват от служител."
+          desc="Начислени автомобили"
         />
         <Stat
           label="Недостъпни"
           value={d.maint}
           tone={d.maint ? 'danger' : 'muted'}
-          desc="Автомобили в ремонт или поддръжка — временно извън употреба."
+          desc="Ремонт или обслужване"
         />
         <Stat
           label="Общо активни"
           value={d.total}
           tone="muted"
-          desc="Общ брой активни автомобили в автопарка (без изтритите)."
+          desc="Общ брой автомобили"
         />
         <Stat
           label="Активни сигнали"
           value={d.issues}
           tone={d.issues ? 'warn' : 'muted'}
-          desc="Неотстранени сигнали за проблеми по автомобилите."
+          desc="Сигнали за проблеми по автомобилите"
         />
         <Stat
           label="Критични"
           value={d.critical}
           tone={d.critical ? 'danger' : 'muted'}
-          desc="Активни сигнали с критична сериозност — изискват спешна намеса."
+          desc="Сигнали за спешен ремонт"
         />
         <Stat
           label="Изтичащи документи"
           value={d.expiring}
           tone={d.expiring ? 'warn' : 'muted'}
-          desc="Застраховки и прегледи, които изтичат скоро или вече са изтекли."
+          desc="Застраховки и прегледи"
         />
         <Stat
           label="Неподали наличност"
           value={d.notSubmitted}
           tone={d.notSubmitted ? 'warn' : 'muted'}
-          desc="Активни служители, които още не са подали наличност за седмицата."
+          desc="Неполучен график за следваща седмица"
         />
       </div>
 

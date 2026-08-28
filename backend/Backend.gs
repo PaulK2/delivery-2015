@@ -2310,6 +2310,21 @@ function takeCar(params, ctx) {
     );
   }
 
+  // A driver may hold at most 2 cars at once. Count what they already have in use.
+  var mineCount = 0;
+  readObjects(TABS.CARS).forEach(function(c) {
+    if (
+      String(c.status) === 'in_use' &&
+      String(c.current_driver_id) === String(ctx.user.employee_id)
+    ) {
+      mineCount++;
+    }
+  });
+
+  if (mineCount >= 2) {
+    return fail('car_limit', { count: mineCount });
+  }
+
   var usageId =
     genId('USE');
 
@@ -3998,6 +4013,58 @@ function fixFleetMakes() {
 
   Logger.log('fixFleetMakes: corrected ' + fixed + ' vehicle(s).');
   return fixed;
+}
+
+
+/**
+ * One-time cleanup of TEST fleet data. Removes ALL maintenance/repair records and all
+ * insurance + annual-inspection (ГТП) documents that were seeded for testing, and
+ * restores any vehicle left marked "maintenance" back to "available". Other document
+ * types (винетка, данък, каско, …) and every table header are preserved.
+ *
+ * Run manually from the Apps Script editor before entering real data. Safe to re-run.
+ */
+function clearTestFleetData() {
+
+  // 1) Wipe every Maintenance row (open issues + resolved repairs); keep the header.
+  var maint = getTab(TABS.MAINTENANCE);
+  var maintRows = maint.getLastRow() - 1;
+  if (maintRows > 0) {
+    maint.getRange(2, 1, maintRows, maint.getLastColumn()).clearContent();
+  }
+
+  // 2) Delete insurance + inspection (ГТП) documents; leave other document types.
+  var docsSheet = getTab(TABS.DOCUMENTS);
+  var docs = readObjects(TABS.DOCUMENTS);
+  var removeTypes = { insurance: true, inspection: true };
+  var docsRemoved = 0;
+  // Delete bottom-up so earlier rows keep their indices as we go.
+  for (var i = docs.length - 1; i >= 0; i--) {
+    if (removeTypes[String(docs[i].type)]) {
+      docsSheet.deleteRow(docs[i].__row);
+      docsRemoved++;
+    }
+  }
+
+  // 3) Any car left "maintenance" from a test critical issue → back to available, and
+  //    clear its notes. status is column 7, notes column 12 in the Cars tab.
+  var carsSheet = getTab(TABS.CARS);
+  var carsRestored = 0;
+  readObjects(TABS.CARS).forEach(function(car) {
+    if (String(car.status) === 'maintenance') {
+      carsSheet.getRange(car.__row, 7).setValue('available');
+      carsSheet.getRange(car.__row, 12).setValue('');
+      carsRestored++;
+    }
+  });
+
+  var summary = {
+    maintenanceCleared: maintRows > 0 ? maintRows : 0,
+    documentsRemoved: docsRemoved,
+    carsRestored: carsRestored
+  };
+  Logger.log('clearTestFleetData: ' + JSON.stringify(summary));
+  return summary;
 }
 
 
