@@ -89,10 +89,11 @@ export async function deleteCar(carId) {
   return res
 }
 
-// Take a vehicle. Backend re-checks availability under a lock and prevents
-// double reservation (spec §30, §31).
-export async function takeCar(carId) {
-  const res = await api('takeCar', { carId })
+// Take a vehicle. Backend re-checks availability under a lock and prevents double
+// reservation (spec §30, §31). `fuelCashStart` (cash for fuel in the vehicle documents)
+// is required; `equipment` records the safety-equipment check (§17, §22).
+export async function takeCar(carId, { fuelCashStart, equipment } = {}) {
+  const res = await api('takeCar', { carId, fuelCashStart, equipment })
   invalidateFleet(carId)
   return res
 }

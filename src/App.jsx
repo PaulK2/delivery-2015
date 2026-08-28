@@ -14,6 +14,8 @@ const VehicleDetailPage = lazy(() => import('./pages/VehicleDetailPage.jsx'))
 const AvailabilityPage = lazy(() => import('./pages/AvailabilityPage.jsx'))
 const MaintenancePage = lazy(() => import('./pages/MaintenancePage.jsx'))
 const AdminPage = lazy(() => import('./pages/AdminPage.jsx'))
+const OrdersPage = lazy(() => import('./pages/OrdersPage.jsx'))
+const ReportPage = lazy(() => import('./pages/ReportPage.jsx'))
 
 function RequireAuth({ children }) {
   const { isAuthenticated, loading } = useAuth()
@@ -69,6 +71,22 @@ export default function App() {
           element={
             <Suspense fallback={<PageLoading />}>
               <AvailabilityPage />
+            </Suspense>
+          }
+        />
+        <Route
+          path="/orders"
+          element={
+            <Suspense fallback={<PageLoading />}>
+              <OrdersPage />
+            </Suspense>
+          }
+        />
+        <Route
+          path="/report"
+          element={
+            <Suspense fallback={<PageLoading />}>
+              <ReportPage />
             </Suspense>
           }
         />

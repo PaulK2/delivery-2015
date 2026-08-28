@@ -3,8 +3,10 @@
 export const NAV_ITEMS = [
   { to: '/', label: 'Начало', icon: 'home', end: true },
   { to: '/schedule', label: 'График', icon: 'calendar' },
+  { to: '/orders', label: 'Поръчки', icon: 'orders' },
+  { to: '/report', label: 'Отчет', icon: 'report' },
   { to: '/availability', label: 'Следваща седмица', icon: 'calendar-check', short: 'Следв.' },
-  { to: '/vehicles', label: 'Автомобили', icon: 'car' },
+  { to: '/vehicles', label: 'Автомобили', icon: 'car', short: 'Коли' },
   { to: '/maintenance', label: 'Сигнали и поддръжка', icon: 'wrench', short: 'Сигнали' },
   { to: '/admin', label: 'Администрация', icon: 'settings', short: 'Админ', adminOnly: true },
 ]

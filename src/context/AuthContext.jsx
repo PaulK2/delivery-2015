@@ -33,6 +33,10 @@ export function AuthProvider({ children }) {
     loading,
     isAuthenticated: !!user,
     isAdmin: user?.role === 'admin',
+    // Capability (not role): may record personal work data — orders, reports, fuel,
+    // payment confirmation. True for regular staff and worker-admins (ПАВЕЛ, В. ПЕТКОВ),
+    // false for review-only admins (ЦЕЦО, СИМО). Mirrors backend canSubmitAvailability.
+    isWorker: !!user?.can_submit_availability,
     login,
     logout,
   }

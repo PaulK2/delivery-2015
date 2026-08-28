@@ -22,7 +22,7 @@ export function setApiUrl(url) {
 
 // Bump on each deploy so we can confirm which frontend build is actually live (shown
 // on the login screen and logged to the console at startup).
-export const APP_VERSION = 'ui-2026-08-28'
+export const APP_VERSION = 'ui-2026-08-28-orders-payroll'
 
 export const CONFIG = {
   appName: 'Delivery 2015',
@@ -94,6 +94,64 @@ export const MODEL_BY_MAKE = {
   chevrolet: 'Aveo',
   opel: 'Astra',
   peugeot: '107',
+}
+
+// ---- Orders / payroll / reports (Major Feature Update) ----
+
+// Each completed delivery order is worth this much toward weekly pay (§7).
+export const ORDER_RATE_EUR = 0.5
+
+// Admins who ALSO work shifts (§48) — kept in sync with the backend's
+// AVAILABILITY_WORKER_ADMINS. Used to build the payroll roster on the client.
+export const WORKER_ADMIN_NAMES = ['ПАВЕЛ', 'В. ПЕТКОВ']
+
+// Whether an employee counts as a "worker" (earns pay, appears on payroll): everyone
+// except review-only admins. Mirrors the backend canSubmitAvailability capability.
+export function isWorkerEmployee(role, name) {
+  if (role !== 'admin') return true
+  const key = String(name || '').toLowerCase().replace(/\s+/g, '')
+  return WORKER_ADMIN_NAMES.some((n) => n.toLowerCase().replace(/\s+/g, '') === key)
+}
+
+// Safety equipment confirmed when a car is taken (§22). `key` matches the UsageHistory
+// column names the backend stores; `label` is the Bulgarian UI text.
+export const SAFETY_EQUIPMENT = [
+  { key: 'has_fire_extinguisher', label: 'Пожарогасител' },
+  { key: 'has_first_aid_kit', label: 'Аптечка' },
+  { key: 'has_warning_triangle', label: 'Триъгълник' },
+  { key: 'has_safety_vest', label: 'Жилетка' },
+]
+
+// Delivery / payment categories for the daily report (§27–§29). `key` is the stored
+// (internal, English) value; `label` is the Bulgarian UI text. Kept in ONE place so a
+// per-restaurant override is a data change, not new UI code.
+export const DELIVERY_TYPES = [
+  { key: 'restaurant_cash', label: 'Ресторант Кеш' },
+  { key: 'restaurant_card', label: 'Ресторант Карта' },
+  { key: 'glovo_cash', label: 'Glovo Кеш' },
+  { key: 'glovo_card', label: 'Glovo Карта' },
+  { key: 'bolt', label: 'Bolt' },
+  { key: 'wolt_cash', label: 'Wolt Кеш' },
+  { key: 'wolt_card', label: 'Wolt Карта' },
+]
+
+// Per-restaurant delivery-type overrides. All six restaurants currently share the same
+// categories, so this stays empty; add `'<lowercased name>': [ ...types ]` to specialize
+// one restaurant later without touching any component.
+export const DELIVERY_TYPES_BY_RESTAURANT = {}
+
+const restaurantKey = (name) =>
+  String(name || '').toLowerCase().replace(/\s+/g, ' ').trim()
+
+// The ordered delivery categories that apply to a given restaurant.
+export function deliveryTypesForRestaurant(name) {
+  return DELIVERY_TYPES_BY_RESTAURANT[restaurantKey(name)] || DELIVERY_TYPES
+}
+
+// Label lookup for a stored delivery-type key (falls back to the key itself).
+export function deliveryTypeLabel(key) {
+  const found = DELIVERY_TYPES.find((t) => t.key === key)
+  return found ? found.label : key
 }
 
 // Canonical display order of the work locations (spec order, not alphabetical).

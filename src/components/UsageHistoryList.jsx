@@ -1,5 +1,13 @@
 import { useMemo, useState } from 'react'
 import { formatStampBG, stampTime, stampDateISO, shiftISO, todayISO } from '../utils/datetime.js'
+import { formatEuro } from '../utils/shifts.js'
+import { SAFETY_EQUIPMENT } from '../config/index.js'
+
+// Safety-equipment items reported missing when the car was taken (§24).
+function missingEquipment(h) {
+  return SAFETY_EQUIPMENT.filter((it) => h[it.key] === false || h[it.key] === 'false')
+    .map((it) => it.label)
+}
 
 // Usage history with period presets and a driver filter (spec §34–§36).
 const PRESETS = [
@@ -66,6 +74,19 @@ export default function UsageHistoryList({ history }) {
               </div>
               {h.parked_location ? (
                 <div className="usage-item__parked">📍 {h.parked_location}</div>
+              ) : null}
+              {h.fuel_cash_start != null && h.fuel_cash_start !== '' ? (
+                <div className="usage-item__fuel">
+                  ⛽ Гориво: {formatEuro(h.fuel_cash_start)} нач. · {formatEuro(h.fuel_spent_total || 0)} заредено
+                  {h.fuel_cash_remaining != null && h.fuel_cash_remaining !== ''
+                    ? ` · ${formatEuro(h.fuel_cash_remaining)} остатък`
+                    : ''}
+                </div>
+              ) : null}
+              {missingEquipment(h).length ? (
+                <div className="usage-item__missing">
+                  ⚠ Липсва оборудване: {missingEquipment(h).join(', ')}
+                </div>
               ) : null}
               {h.notes ? <div className="usage-item__notes">{h.notes}</div> : null}
             </li>

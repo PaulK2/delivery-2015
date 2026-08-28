@@ -38,6 +38,20 @@ export function formatMoney(value) {
 // Shift payment (СМЯНА) display — same formatting as any money value.
 export const formatPayment = formatMoney
 
+// Euro amount with two decimals, e.g. "€32.50" — used across payroll, orders and fuel.
+export function formatEuro(value) {
+  const n = Number(value)
+  if (value == null || value === '' || Number.isNaN(n)) return '€0.00'
+  return `€${n.toFixed(2)}`
+}
+
+// Parse a schedule payment (СМЯНА) string like "45" / "24,5" into a number, or null.
+export function parsePayment(value) {
+  const s = String(value == null ? '' : value).trim().replace(',', '.')
+  if (!/^\d+(\.\d+)?$/.test(s)) return null
+  return parseFloat(s)
+}
+
 // Does a schedule row's assigned car (КОЛИ) refer to the built-in own car?
 export function isOwnCarAssignment(car) {
   return String(car || '').trim().toLowerCase().includes('собствен')

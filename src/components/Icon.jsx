@@ -68,6 +68,31 @@ const ICONS = {
   // Day navigation — chevrons
   'chevron-left': <path d="M15 5l-7 7 7 7" />,
   'chevron-right': <path d="M9 5l7 7-7 7" />,
+  // Поръчки — clipboard with list lines
+  orders: (
+    <>
+      <rect x="5" y="4.5" width="14" height="16" rx="2" />
+      <path d="M9 4.5a1.5 1.5 0 0 1 1.5-1.5h3A1.5 1.5 0 0 1 15 4.5v1h-6Z" />
+      <path d="M8.5 10h7M8.5 13.5h7M8.5 17h4" />
+    </>
+  ),
+  // Отчет — document with a total line
+  report: (
+    <>
+      <path d="M6.5 3.5h7l4 4V20a1 1 0 0 1-1 1h-10a1 1 0 0 1-1-1V4.5a1 1 0 0 1 1-1Z" />
+      <path d="M13 3.5V8h4" />
+      <path d="M8.5 12h7M8.5 15h7M8.5 18h4" />
+    </>
+  ),
+  // Гориво — fuel pump
+  fuel: (
+    <>
+      <path d="M5 20V6a2 2 0 0 1 2-2h5a2 2 0 0 1 2 2v14" />
+      <path d="M4 20h11" />
+      <path d="M8 9h6" />
+      <path d="M14 8l3 3v6a1.5 1.5 0 0 0 3 0V9.5L17 6.5" />
+    </>
+  ),
   // Администрация — sliders (settings)
   settings: (
     <>

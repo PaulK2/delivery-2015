@@ -38,7 +38,18 @@ var SESSION_TTL_DAYS = 30;
 // Bump on every meaningful backend change. Visible via doGet (open the /exec URL in a
 // browser) so you can confirm which code the DEPLOYED web app is actually running —
 // Apps Script serves the last DEPLOYED VERSION, not merely the saved script.
-var BACKEND_VERSION = '2026-08-28-worker-admins';
+var BACKEND_VERSION = '2026-08-28-orders-payroll-fuel-reports';
+
+// Each completed delivery order is worth this much toward the worker's weekly pay.
+var ORDER_RATE_EUR = 0.5;
+
+// Safety equipment confirmed when a car is taken (usage-history flags).
+var SAFETY_EQUIPMENT_FIELDS = [
+  'has_fire_extinguisher',
+  'has_first_aid_kit',
+  'has_warning_triangle',
+  'has_safety_vest'
+];
 
 // Short server-side cache for the external schedule grid. Reading another Google Sheet
 // through Apps Script is slow, so cache the raw matrix briefly; background polls reuse
@@ -82,7 +93,12 @@ var TABS = {
   USAGE: 'UsageHistory',
   MAINTENANCE: 'Maintenance',
   DOCUMENTS: 'Documents',
-  AVAILABILITY: 'Availability'
+  AVAILABILITY: 'Availability',
+
+  ORDERS: 'Orders',
+  FUEL: 'FuelExpenses',
+  REPORTS: 'DailyReports',
+  PAYROLL: 'Payroll'
 };
 
 
@@ -148,7 +164,9 @@ var DEFAULT_HEADERS = {
     'active',
     'last_odometer',
     'last_oil_change_odometer',
-    'last_oil_change_date'
+    'last_oil_change_date',
+    'fuel_cash_start',
+    'fuel_spent_total'
   ],
 
   UsageHistory: [
@@ -160,7 +178,14 @@ var DEFAULT_HEADERS = {
     'start_at',
     'end_at',
     'parked_location',
-    'notes'
+    'notes',
+    'fuel_cash_start',
+    'fuel_spent_total',
+    'fuel_cash_remaining',
+    'has_fire_extinguisher',
+    'has_first_aid_kit',
+    'has_warning_triangle',
+    'has_safety_vest'
   ],
 
   Maintenance: [
@@ -204,6 +229,64 @@ var DEFAULT_HEADERS = {
     'week_start',
     'date',
     'shift_type',
+    'updated_at'
+  ],
+
+  Orders: [
+    'order_record_id',
+    'employee_id',
+    'employee_name',
+    'date',
+    'week_start',
+    'restaurant',
+    'shift_type',
+    'order_count',
+    'order_salary',
+    'updated_at'
+  ],
+
+  FuelExpenses: [
+    'fuel_entry_id',
+    'car_id',
+    'registration',
+    'employee_id',
+    'employee_name',
+    'usage_id',
+    'amount',
+    'date',
+    'week_start',
+    'created_at',
+    'notes'
+  ],
+
+  DailyReports: [
+    'report_id',
+    'employee_id',
+    'employee_name',
+    'date',
+    'week_start',
+    'restaurant',
+    'delivery_type',
+    'count',
+    'updated_at'
+  ],
+
+  Payroll: [
+    'payroll_id',
+    'employee_id',
+    'employee_name',
+    'week_start',
+    'base_salary',
+    'orders_count',
+    'orders_salary',
+    'fuel_salary',
+    'final_amount',
+    'paid',
+    'paid_at',
+    'paid_by_id',
+    'paid_by_name',
+    'received_confirmed',
+    'received_confirmed_at',
     'updated_at'
   ]
 };
@@ -380,6 +463,26 @@ function dateOnly(date) {
     TIMEZONE,
     'yyyy-MM-dd'
   );
+}
+
+
+// Monday (yyyy-MM-dd) of the ISO week containing `iso`. Pure calendar math in UTC so it
+// is independent of the script's timezone. Matches the frontend's week_start convention.
+function mondayOfISO(iso) {
+
+  var s = normalizeIsoDate(iso);
+
+  var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s);
+  if (!m) {
+    return s;
+  }
+
+  var d = new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3])));
+  var wd = d.getUTCDay(); // 0=Sun..6=Sat
+  var diff = (wd === 0) ? -6 : (1 - wd);
+  d.setUTCDate(d.getUTCDate() + diff);
+
+  return Utilities.formatDate(d, 'UTC', 'yyyy-MM-dd');
 }
 
 
@@ -1204,6 +1307,23 @@ function requireAdmin(ctx) {
 }
 
 
+// Guard for actions that record PERSONAL work data (orders, reports, fuel, payment
+// confirmation). Allowed for regular staff and worker-admins (ПАВЕЛ, В. ПЕТКОВ), but not
+// review-only admins (ЦЕЦО, СИМО) — the same capability as submitting availability.
+function requireWorker(ctx) {
+
+  if (!ctx.user) {
+    return fail('unauthorized');
+  }
+
+  if (!canSubmitAvailability(ctx.user)) {
+    return fail('forbidden');
+  }
+
+  return null;
+}
+
+
 /* ============================================================================
  * LOCATIONS
  * ========================================================================== */
@@ -2017,7 +2137,20 @@ function serializeCar(car) {
 
     // Soft, non-blocking flag: 10 000+ km since the last oil change.
     oil_change_due:
-      isOilChangeDue(car)
+      isOilChangeDue(car),
+
+    // Fuel-money balance for the CURRENT usage session (only meaningful while in_use).
+    // Starting cash entered when the car was taken, minus the fuel expenses recorded.
+    fuel_cash_start:
+      toNumberOrNull(car.fuel_cash_start),
+
+    fuel_spent_total:
+      toNumberOrNull(car.fuel_spent_total) || 0,
+
+    fuel_cash_remaining:
+      (toNumberOrNull(car.fuel_cash_start) == null)
+        ? null
+        : (toNumberOrNull(car.fuel_cash_start) - (toNumberOrNull(car.fuel_spent_total) || 0))
   };
 }
 
@@ -2325,6 +2458,17 @@ function takeCar(params, ctx) {
     return fail('car_limit', { count: mineCount });
   }
 
+  // Cash/fuel money available in the vehicle documents when taken (spec §17). Required —
+  // it becomes the starting fuel-money balance for this usage session.
+  var fuelCashStart = toNumberOrNull(params.fuelCashStart);
+  if (fuelCashStart == null || fuelCashStart < 0) {
+    return fail('fuel_cash_required');
+  }
+
+  // Safety-equipment confirmation (spec §22–§24). Missing items don't block taking the
+  // car; they're recorded so the gap is visible in history and to admins.
+  var equipment = params.equipment || {};
+
   var usageId =
     genId('USE');
 
@@ -2332,7 +2476,9 @@ function takeCar(params, ctx) {
     nowStamp();
 
 
-  getTab(TABS.USAGE)
+  var usageSheet = getTab(TABS.USAGE);
+
+  usageSheet
     .appendRow([
 
       usageId,
@@ -2354,8 +2500,23 @@ function takeCar(params, ctx) {
       ''
     ]);
 
+  // Record fuel-money start + safety-equipment state on the new usage row (columns added
+  // on the fly so already-deployed sheets pick them up too).
+  var usageRow = usageSheet.getLastRow();
+  usageSheet.getRange(usageRow, ensureColumn(usageSheet, 'fuel_cash_start')).setValue(fuelCashStart);
+  usageSheet.getRange(usageRow, ensureColumn(usageSheet, 'fuel_spent_total')).setValue(0);
+  usageSheet.getRange(usageRow, ensureColumn(usageSheet, 'fuel_cash_remaining')).setValue(fuelCashStart);
+  for (var si = 0; si < SAFETY_EQUIPMENT_FIELDS.length; si++) {
+    var field = SAFETY_EQUIPMENT_FIELDS[si];
+    usageSheet
+      .getRange(usageRow, ensureColumn(usageSheet, field))
+      .setValue(equipment[field] === true);
+  }
 
-  getTab(TABS.CARS)
+
+  var carsSheet = getTab(TABS.CARS);
+
+  carsSheet
     .getRange(
       car.__row,
       1,
@@ -2378,13 +2539,33 @@ function takeCar(params, ctx) {
       true
     ]]);
 
+  // Session fuel-money balance on the car row (outside the fixed 13-wide write above).
+  carsSheet.getRange(car.__row, ensureColumn(carsSheet, 'fuel_cash_start')).setValue(fuelCashStart);
+  carsSheet.getRange(car.__row, ensureColumn(carsSheet, 'fuel_spent_total')).setValue(0);
+
+
+  // Note any missing safety equipment in the audit trail.
+  var missing = [];
+  var EQUIP_LABELS = {
+    has_fire_extinguisher: 'Пожарогасител',
+    has_first_aid_kit: 'Аптечка',
+    has_warning_triangle: 'Триъгълник',
+    has_safety_vest: 'Жилетка'
+  };
+  for (var mi = 0; mi < SAFETY_EQUIPMENT_FIELDS.length; mi++) {
+    if (equipment[SAFETY_EQUIPMENT_FIELDS[mi]] !== true) {
+      missing.push(EQUIP_LABELS[SAFETY_EQUIPMENT_FIELDS[mi]]);
+    }
+  }
 
   audit(
     ctx.user,
     'car_taken',
     'car',
     car.car_id,
-    car.registration
+    car.registration +
+      ' · гориво в документите: ' + fuelCashStart + ' €' +
+      (missing.length ? ' · липсва: ' + missing.join(', ') : '')
   );
 
 
@@ -2397,7 +2578,10 @@ function takeCar(params, ctx) {
       usageId,
 
     started_at:
-      startedAt
+      startedAt,
+
+    fuel_cash_start:
+      fuelCashStart
   });
 }
 
@@ -2528,12 +2712,23 @@ function releaseCar(params, ctx) {
           );
       }
 
+      // Freeze the final fuel-money balance into this historical usage row.
+      var startCash = toNumberOrNull(car.fuel_cash_start);
+      var spent = toNumberOrNull(car.fuel_spent_total) || 0;
+      if (startCash != null) {
+        usageSheet.getRange(usageRows[i].__row, ensureColumn(usageSheet, 'fuel_cash_start')).setValue(startCash);
+        usageSheet.getRange(usageRows[i].__row, ensureColumn(usageSheet, 'fuel_spent_total')).setValue(spent);
+        usageSheet.getRange(usageRows[i].__row, ensureColumn(usageSheet, 'fuel_cash_remaining')).setValue(startCash - spent);
+      }
+
       break;
     }
   }
 
 
-  getTab(TABS.CARS)
+  var carsSheet = getTab(TABS.CARS);
+
+  carsSheet
     .getRange(
       car.__row,
       1,
@@ -2558,10 +2753,14 @@ function releaseCar(params, ctx) {
 
 
   // Record the odometer reading in its own column (outside the fixed 13-wide write).
-  var carsSheet = getTab(TABS.CARS);
   carsSheet
     .getRange(car.__row, ensureColumn(carsSheet, 'last_odometer'))
     .setValue(odometer);
+
+  // Clear the car's live session fuel-money fields (the session is over; the balance is
+  // now preserved on the usage-history row above).
+  carsSheet.getRange(car.__row, ensureColumn(carsSheet, 'fuel_cash_start')).setValue('');
+  carsSheet.getRange(car.__row, ensureColumn(carsSheet, 'fuel_spent_total')).setValue('');
 
 
   audit(
@@ -4264,6 +4463,486 @@ function setTestScheduleUrl() {
 
 
 /* ============================================================================
+ * ORDERS  (worker order counts + €0.50/order salary)
+ * ========================================================================== */
+
+// Empty sheet cells read back as '' — treat only explicit truthy values as true (an
+// empty cell must mean false for paid/received flags; normalizeBoolean('') is true).
+function strictBool(v) {
+  if (v === true) return true;
+  var s = String(v).toLowerCase().trim();
+  return s === 'true' || s === '1' || s === 'yes' || s === 'да';
+}
+
+
+function serializeOrder(row) {
+  return {
+    order_record_id: row.order_record_id,
+    employee_id: row.employee_id,
+    employee_name: row.employee_name || '',
+    date: normalizeIsoDate(row.date),
+    week_start: normalizeIsoDate(row.week_start),
+    restaurant: row.restaurant || '',
+    shift_type: row.shift_type || '',
+    order_count: toNumberOrNull(row.order_count) || 0,
+    order_salary: toNumberOrNull(row.order_salary) || 0,
+    updated_at: row.updated_at
+  };
+}
+
+
+// Worker records/updates the number of orders for one workday (today or any past day).
+// One record per employee+date; saving again updates it. Future dates are rejected.
+function saveOrderCount(params, ctx) {
+
+  var notWorker = requireWorker(ctx);
+  if (notWorker) return notWorker;
+
+  var date = normalizeIsoDate(params.date);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return fail('validation');
+  if (date > dateOnly(new Date())) return fail('future_date');
+
+  var count = toNumberOrNull(params.orderCount);
+  if (count == null || count < 0) return fail('validation');
+  count = Math.round(count);
+
+  var restaurant = String(params.restaurant || '').trim();
+  var shiftType = String(params.shiftType || '').trim();
+  var weekStart = mondayOfISO(date);
+  var salary = count * ORDER_RATE_EUR;
+  var updatedAt = nowStamp();
+
+  var sheet = getTab(TABS.ORDERS);
+  var rows = readObjects(TABS.ORDERS);
+
+  for (var i = 0; i < rows.length; i++) {
+    if (String(rows[i].employee_id) === String(ctx.user.employee_id) &&
+        normalizeIsoDate(rows[i].date) === date) {
+      sheet.getRange(rows[i].__row, 5).setValue(weekStart);
+      sheet.getRange(rows[i].__row, 6).setValue(restaurant);
+      sheet.getRange(rows[i].__row, 7).setValue(shiftType);
+      sheet.getRange(rows[i].__row, 8).setValue(count);
+      sheet.getRange(rows[i].__row, 9).setValue(salary);
+      sheet.getRange(rows[i].__row, 10).setValue(updatedAt);
+      audit(ctx.user, 'order_count_updated', 'orders', rows[i].order_record_id, date + ' · ' + count + ' поръчки');
+      return ok({ order_record_id: rows[i].order_record_id, order_count: count, order_salary: salary });
+    }
+  }
+
+  var id = genId('ORD');
+  sheet.appendRow([id, ctx.user.employee_id, ctx.user.name, date, weekStart, restaurant, shiftType, count, salary, updatedAt]);
+  audit(ctx.user, 'order_count_created', 'orders', id, date + ' · ' + count + ' поръчки');
+  return ok({ order_record_id: id, order_count: count, order_salary: salary });
+}
+
+
+// Orders for a week. Non-admins only ever see their own; admins may pass employeeId to
+// scope, or omit it for the whole team.
+function getOrdersForWeek(params, ctx) {
+
+  var unauth = requireAuth(ctx);
+  if (unauth) return unauth;
+
+  var weekStart = mondayOfISO(params.weekStart || dateOnly(new Date()));
+  var isAdmin = String(ctx.user.role) === 'admin';
+  var scopeEmp = params.employeeId ? String(params.employeeId) : '';
+  if (!isAdmin) scopeEmp = String(ctx.user.employee_id);
+
+  var rows = readObjects(TABS.ORDERS).filter(function(r) {
+    if (normalizeIsoDate(r.week_start) !== weekStart) return false;
+    if (scopeEmp && String(r.employee_id) !== scopeEmp) return false;
+    return true;
+  });
+
+  return ok({ orders: rows.map(serializeOrder), week_start: weekStart });
+}
+
+
+/* ============================================================================
+ * FUEL EXPENSES  (per-usage fuel-money balance + weekly totals)
+ * ========================================================================== */
+
+function serializeFuel(row) {
+  return {
+    fuel_entry_id: row.fuel_entry_id,
+    car_id: row.car_id,
+    registration: row.registration || '',
+    employee_id: row.employee_id,
+    employee_name: row.employee_name || '',
+    usage_id: row.usage_id || '',
+    amount: toNumberOrNull(row.amount) || 0,
+    date: normalizeIsoDate(row.date),
+    week_start: normalizeIsoDate(row.week_start),
+    created_at: row.created_at,
+    notes: row.notes || ''
+  };
+}
+
+
+// The current driver (or an admin) records a fuel expense for the car they're driving.
+// The amount is subtracted from the fuel money that was in the vehicle when it was taken.
+function addFuelExpense(params, ctx) {
+
+  var unauth = requireAuth(ctx);
+  if (unauth) return unauth;
+
+  var car = findCar(params.carId);
+  if (!car) return fail('car_not_found');
+  if (String(car.status) !== 'in_use') return fail('car_not_in_use');
+
+  var isDriver = String(car.current_driver_id) === String(ctx.user.employee_id);
+  var isAdmin = String(ctx.user.role) === 'admin';
+  if (!isDriver && !isAdmin) return fail('forbidden');
+
+  var amount = toNumberOrNull(params.amount);
+  if (amount == null || amount <= 0) return fail('validation');
+
+  var now = nowStamp();
+  var date = dateOnly(new Date());
+  var weekStart = mondayOfISO(date);
+  var id = genId('FUEL');
+
+  getTab(TABS.FUEL).appendRow([
+    id, car.car_id, car.registration,
+    ctx.user.employee_id, ctx.user.name,
+    car.current_usage_id || '',
+    amount, date, weekStart, now,
+    String(params.notes || '').trim()
+  ]);
+
+  var carsSheet = getTab(TABS.CARS);
+  var newSpent = (toNumberOrNull(car.fuel_spent_total) || 0) + amount;
+  carsSheet.getRange(car.__row, ensureColumn(carsSheet, 'fuel_spent_total')).setValue(newSpent);
+
+  var start = toNumberOrNull(car.fuel_cash_start);
+  var remaining = (start == null) ? null : (start - newSpent);
+
+  audit(ctx.user, 'fuel_expense_added', 'car', car.car_id, car.registration + ' · ' + amount + ' €');
+  return ok({ fuel_entry_id: id, amount: amount, fuel_spent_total: newSpent, fuel_cash_remaining: remaining });
+}
+
+
+// Fuel expenses for a week. Non-admins see only their own; admins see all, optionally
+// filtered to one car (for the per-vehicle weekly fuel view).
+function getFuelExpensesForWeek(params, ctx) {
+
+  var unauth = requireAuth(ctx);
+  if (unauth) return unauth;
+
+  var weekStart = mondayOfISO(params.weekStart || dateOnly(new Date()));
+  var isAdmin = String(ctx.user.role) === 'admin';
+  var carId = params.carId ? String(params.carId) : '';
+  var scopeEmp = isAdmin ? '' : String(ctx.user.employee_id);
+
+  var rows = readObjects(TABS.FUEL).filter(function(r) {
+    if (normalizeIsoDate(r.week_start) !== weekStart) return false;
+    if (carId && String(r.car_id) !== carId) return false;
+    if (scopeEmp && String(r.employee_id) !== scopeEmp) return false;
+    return true;
+  });
+
+  return ok({ fuel: rows.map(serializeFuel), week_start: weekStart });
+}
+
+
+// Fuel expenses for one usage session (the active-vehicle page lists what's been spent).
+function getFuelExpensesForUsage(params, ctx) {
+
+  var unauth = requireAuth(ctx);
+  if (unauth) return unauth;
+
+  var usageId = String(params.usageId || '');
+  if (!usageId) return fail('validation');
+
+  var rows = readObjects(TABS.FUEL).filter(function(r) {
+    return String(r.usage_id) === usageId;
+  });
+
+  return ok({ fuel: rows.map(serializeFuel) });
+}
+
+
+/* ============================================================================
+ * DAILY REPORTS  (detailed deliveries by payment/channel type)
+ * ========================================================================== */
+
+function serializeReportRow(row) {
+  return {
+    report_id: row.report_id,
+    employee_id: row.employee_id,
+    employee_name: row.employee_name || '',
+    date: normalizeIsoDate(row.date),
+    week_start: normalizeIsoDate(row.week_start),
+    restaurant: row.restaurant || '',
+    delivery_type: row.delivery_type || '',
+    count: toNumberOrNull(row.count) || 0,
+    updated_at: row.updated_at
+  };
+}
+
+
+// Worker saves/updates a daily report (one normalized row per delivery category), keyed
+// by employee+date+restaurant so re-saving edits in place instead of duplicating.
+function saveDailyReport(params, ctx) {
+
+  var notWorker = requireWorker(ctx);
+  if (notWorker) return notWorker;
+
+  var date = normalizeIsoDate(params.date);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return fail('validation');
+  if (date > dateOnly(new Date())) return fail('future_date');
+
+  var restaurant = String(params.restaurant || '').trim();
+  if (!restaurant) return fail('validation');
+
+  var counts = params.counts || {};
+  var weekStart = mondayOfISO(date);
+  var updatedAt = nowStamp();
+
+  var sheet = getTab(TABS.REPORTS);
+  var rows = readObjects(TABS.REPORTS);
+
+  var existing = {};
+  for (var i = 0; i < rows.length; i++) {
+    if (String(rows[i].employee_id) === String(ctx.user.employee_id) &&
+        normalizeIsoDate(rows[i].date) === date &&
+        String(rows[i].restaurant) === restaurant) {
+      existing[String(rows[i].delivery_type)] = rows[i];
+    }
+  }
+
+  var types = Object.keys(counts);
+  for (var t = 0; t < types.length; t++) {
+    var type = types[t];
+    var value = toNumberOrNull(counts[type]);
+    if (value == null || value < 0) value = 0;
+    value = Math.round(value);
+
+    if (existing[type]) {
+      sheet.getRange(existing[type].__row, 8).setValue(value);
+      sheet.getRange(existing[type].__row, 9).setValue(updatedAt);
+    } else {
+      sheet.appendRow([genId('RPT'), ctx.user.employee_id, ctx.user.name, date, weekStart, restaurant, type, value, updatedAt]);
+    }
+  }
+
+  audit(ctx.user, 'daily_report_saved', 'report', ctx.user.employee_id + ':' + date, restaurant);
+  return ok({ date: date, restaurant: restaurant });
+}
+
+
+// A worker's report for a day (own only for non-admins; admins may pass employeeId).
+function getDailyReport(params, ctx) {
+
+  var unauth = requireAuth(ctx);
+  if (unauth) return unauth;
+
+  var date = normalizeIsoDate(params.date);
+  var isAdmin = String(ctx.user.role) === 'admin';
+  var scopeEmp = params.employeeId ? String(params.employeeId) : '';
+  if (!isAdmin) scopeEmp = String(ctx.user.employee_id);
+  var restaurant = params.restaurant ? String(params.restaurant) : '';
+
+  var rows = readObjects(TABS.REPORTS).filter(function(r) {
+    if (normalizeIsoDate(r.date) !== date) return false;
+    if (scopeEmp && String(r.employee_id) !== scopeEmp) return false;
+    if (restaurant && String(r.restaurant) !== restaurant) return false;
+    return true;
+  });
+
+  return ok({ report: rows.map(serializeReportRow), date: date });
+}
+
+
+// Admin: every worker's report rows for one date (grouped restaurant→worker on the client).
+function getReportsForDate(params, ctx) {
+
+  var notAdmin = requireAdmin(ctx);
+  if (notAdmin) return notAdmin;
+
+  var date = normalizeIsoDate(params.date);
+  var rows = readObjects(TABS.REPORTS).filter(function(r) {
+    return normalizeIsoDate(r.date) === date;
+  });
+
+  return ok({ reports: rows.map(serializeReportRow), date: date });
+}
+
+
+/* ============================================================================
+ * PAYROLL  (weekly pay = base + orders + fuel; payment/received tracking)
+ * ========================================================================== */
+
+// Sum Orders and FuelExpenses per employee for a week (base salary comes from the
+// schedule and is supplied by the client, which parses that grid).
+function aggregateWeek(weekStart) {
+
+  var orders = {};
+  readObjects(TABS.ORDERS).forEach(function(r) {
+    if (normalizeIsoDate(r.week_start) !== weekStart) return;
+    var id = String(r.employee_id);
+    if (!orders[id]) orders[id] = { employee_id: id, employee_name: r.employee_name || '', orders_count: 0, orders_salary: 0 };
+    orders[id].orders_count += toNumberOrNull(r.order_count) || 0;
+    orders[id].orders_salary += toNumberOrNull(r.order_salary) || 0;
+  });
+
+  var fuel = {};
+  readObjects(TABS.FUEL).forEach(function(r) {
+    if (normalizeIsoDate(r.week_start) !== weekStart) return;
+    var id = String(r.employee_id);
+    if (!fuel[id]) fuel[id] = { employee_id: id, employee_name: r.employee_name || '', fuel_salary: 0 };
+    fuel[id].fuel_salary += toNumberOrNull(r.amount) || 0;
+  });
+
+  return { orders: orders, fuel: fuel };
+}
+
+
+function serializePayrollRow(row) {
+  return {
+    payroll_id: row.payroll_id,
+    employee_id: row.employee_id,
+    employee_name: row.employee_name || '',
+    week_start: normalizeIsoDate(row.week_start),
+    base_salary: toNumberOrNull(row.base_salary),
+    orders_count: toNumberOrNull(row.orders_count),
+    orders_salary: toNumberOrNull(row.orders_salary),
+    fuel_salary: toNumberOrNull(row.fuel_salary),
+    final_amount: toNumberOrNull(row.final_amount),
+    paid: strictBool(row.paid),
+    paid_at: row.paid_at || '',
+    paid_by_id: row.paid_by_id || '',
+    paid_by_name: row.paid_by_name || '',
+    received_confirmed: strictBool(row.received_confirmed),
+    received_confirmed_at: row.received_confirmed_at || '',
+    updated_at: row.updated_at
+  };
+}
+
+
+// Admin: payroll payment state for a week + server-side order/fuel aggregates. The client
+// adds base salary (from the schedule) and merges by employee_id.
+function getPayrollForWeek(params, ctx) {
+
+  var notAdmin = requireAdmin(ctx);
+  if (notAdmin) return notAdmin;
+
+  var weekStart = mondayOfISO(params.weekStart || dateOnly(new Date()));
+
+  var payroll = readObjects(TABS.PAYROLL).filter(function(r) {
+    return normalizeIsoDate(r.week_start) === weekStart;
+  }).map(serializePayrollRow);
+
+  var agg = aggregateWeek(weekStart);
+  var orders = Object.keys(agg.orders).map(function(k) { return agg.orders[k]; });
+  var fuel = Object.keys(agg.fuel).map(function(k) { return agg.fuel[k]; });
+
+  return ok({ week_start: weekStart, payroll: payroll, orders: orders, fuel: fuel });
+}
+
+
+// A worker's own payroll record for a week (so they can see paid/received state).
+function getMyPayroll(params, ctx) {
+
+  var unauth = requireAuth(ctx);
+  if (unauth) return unauth;
+
+  var weekStart = mondayOfISO(params.weekStart || dateOnly(new Date()));
+  var mine = null;
+  readObjects(TABS.PAYROLL).forEach(function(r) {
+    if (normalizeIsoDate(r.week_start) === weekStart && String(r.employee_id) === String(ctx.user.employee_id)) {
+      mine = serializePayrollRow(r);
+    }
+  });
+
+  return ok({ week_start: weekStart, payroll: mine });
+}
+
+
+// Find (or create a blank) payroll row for an employee+week. Returns its 1-based row.
+function upsertPayrollRow(employeeId, employeeName, weekStart) {
+
+  var sheet = getTab(TABS.PAYROLL);
+  var rows = readObjects(TABS.PAYROLL);
+
+  for (var i = 0; i < rows.length; i++) {
+    if (normalizeIsoDate(rows[i].week_start) === weekStart && String(rows[i].employee_id) === String(employeeId)) {
+      return { sheet: sheet, rowIndex: rows[i].__row };
+    }
+  }
+
+  sheet.appendRow([genId('PAY'), employeeId, employeeName, weekStart, '', '', '', '', '', false, '', '', '', false, '', nowStamp()]);
+  return { sheet: sheet, rowIndex: sheet.getLastRow() };
+}
+
+
+// Admin: mark (or unmark) a worker's weekly salary as paid, snapshotting the amounts so
+// the historical record is preserved independently of later schedule/order/fuel changes.
+function setPayrollPaid(params, ctx) {
+
+  var notAdmin = requireAdmin(ctx);
+  if (notAdmin) return notAdmin;
+
+  var employeeId = String(params.employeeId || '');
+  var weekStart = mondayOfISO(params.weekStart || '');
+  if (!employeeId || !/^\d{4}-\d{2}-\d{2}$/.test(weekStart)) return fail('validation');
+
+  var paid = params.paid !== false;
+  var loc = upsertPayrollRow(employeeId, String(params.employeeName || ''), weekStart);
+  var sheet = loc.sheet;
+  var row = loc.rowIndex;
+
+  if (params.baseSalary != null) sheet.getRange(row, 5).setValue(toNumberOrNull(params.baseSalary));
+  if (params.ordersCount != null) sheet.getRange(row, 6).setValue(toNumberOrNull(params.ordersCount));
+  if (params.ordersSalary != null) sheet.getRange(row, 7).setValue(toNumberOrNull(params.ordersSalary));
+  if (params.fuelSalary != null) sheet.getRange(row, 8).setValue(toNumberOrNull(params.fuelSalary));
+  if (params.finalAmount != null) sheet.getRange(row, 9).setValue(toNumberOrNull(params.finalAmount));
+
+  sheet.getRange(row, 10).setValue(paid);
+  sheet.getRange(row, 11).setValue(paid ? nowStamp() : '');
+  sheet.getRange(row, 12).setValue(paid ? ctx.user.employee_id : '');
+  sheet.getRange(row, 13).setValue(paid ? ctx.user.name : '');
+  if (!paid) {
+    sheet.getRange(row, 14).setValue(false);
+    sheet.getRange(row, 15).setValue('');
+  }
+  sheet.getRange(row, 16).setValue(nowStamp());
+
+  audit(ctx.user, paid ? 'payroll_marked_paid' : 'payroll_unmarked_paid', 'payroll', employeeId, weekStart);
+  return ok({ employee_id: employeeId, week_start: weekStart, paid: paid });
+}
+
+
+// Worker confirms they received their pay for a week (requires the admin to have marked
+// it paid first). Creates a second, independent confirmation so discrepancies show.
+function confirmPayrollReceived(params, ctx) {
+
+  var unauth = requireAuth(ctx);
+  if (unauth) return unauth;
+
+  var weekStart = mondayOfISO(params.weekStart || '');
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(weekStart)) return fail('validation');
+
+  var sheet = getTab(TABS.PAYROLL);
+  var rows = readObjects(TABS.PAYROLL);
+
+  for (var i = 0; i < rows.length; i++) {
+    if (normalizeIsoDate(rows[i].week_start) === weekStart &&
+        String(rows[i].employee_id) === String(ctx.user.employee_id)) {
+      if (!strictBool(rows[i].paid)) return fail('not_paid_yet');
+      sheet.getRange(rows[i].__row, 14).setValue(true);
+      sheet.getRange(rows[i].__row, 15).setValue(nowStamp());
+      sheet.getRange(rows[i].__row, 16).setValue(nowStamp());
+      audit(ctx.user, 'payroll_received_confirmed', 'payroll', ctx.user.employee_id, weekStart);
+      return ok({ week_start: weekStart, received_confirmed: true });
+    }
+  }
+
+  return fail('not_found');
+}
+
+
+/* ============================================================================
  * WEB API ROUTES
  * ========================================================================== */
 
@@ -4454,6 +5133,71 @@ var ROUTES = {
 
   setAvailabilityWeek: {
     fn: setAvailabilityWeek,
+    lock: true
+  },
+
+
+  /* Orders */
+
+  getOrdersForWeek: {
+    fn: getOrdersForWeek
+  },
+
+  saveOrderCount: {
+    fn: saveOrderCount,
+    lock: true
+  },
+
+
+  /* Fuel expenses */
+
+  addFuelExpense: {
+    fn: addFuelExpense,
+    lock: true
+  },
+
+  getFuelExpensesForWeek: {
+    fn: getFuelExpensesForWeek
+  },
+
+  getFuelExpensesForUsage: {
+    fn: getFuelExpensesForUsage
+  },
+
+
+  /* Daily reports */
+
+  saveDailyReport: {
+    fn: saveDailyReport,
+    lock: true
+  },
+
+  getDailyReport: {
+    fn: getDailyReport
+  },
+
+  getReportsForDate: {
+    fn: getReportsForDate
+  },
+
+
+  /* Payroll */
+
+  getPayrollForWeek: {
+    fn: getPayrollForWeek
+  },
+
+  getMyPayroll: {
+    fn: getMyPayroll
+  },
+
+  setPayrollPaid: {
+    fn: setPayrollPaid,
+    lock: true
+  },
+
+  confirmPayrollReceived: {
+    fn: confirmPayrollReceived,
     lock: true
   }
 };

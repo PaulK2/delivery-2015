@@ -12,10 +12,11 @@ import {
 } from '../services/fleet/fleet.js'
 import { reportIssue, resolveIssue } from '../services/maintenance/maintenance.js'
 import { getVehicleDocuments, saveVehicleDocument } from '../services/documents/documents.js'
+import { addFuelExpense, getFuelExpensesForUsage } from '../services/fuel/fuel.js'
 import { useAuth } from '../context/AuthContext.jsx'
 import { useToast } from '../context/ToastContext.jsx'
 import { carTitle, carPhoto, isOwnCar, oilInfo, SEVERITY, severityRank, categoryLabel } from '../utils/vehicles.js'
-import { formatMoney } from '../utils/shifts.js'
+import { formatMoney, formatEuro } from '../utils/shifts.js'
 import { CONFIG } from '../config/index.js'
 import { formatStampBG, formatDateBG } from '../utils/datetime.js'
 import StatusBadge from '../components/StatusBadge.jsx'
@@ -24,6 +25,8 @@ import OilChangeModal from '../components/OilChangeModal.jsx'
 import ReportIssueModal from '../components/ReportIssueModal.jsx'
 import ResolveIssueModal from '../components/ResolveIssueModal.jsx'
 import ConfirmModal from '../components/ConfirmModal.jsx'
+import TakeCarModal from '../components/TakeCarModal.jsx'
+import FuelExpenseModal from '../components/FuelExpenseModal.jsx'
 import UsageHistoryList from '../components/UsageHistoryList.jsx'
 import DocumentsSection from '../components/DocumentsSection.jsx'
 import DocumentModal from '../components/DocumentModal.jsx'
@@ -47,6 +50,9 @@ export default function VehicleDetailPage() {
   const [resolving, setResolving] = useState(null) // issue being resolved, or null
   const [docModal, setDocModal] = useState(null) // { doc } to edit/add, or null closed
   const [confirmTake, setConfirmTake] = useState(null) // { plate } when taking a 2nd car
+  const [showTake, setShowTake] = useState(false) // fuel-money + equipment take modal
+  const [showFuel, setShowFuel] = useState(false) // fuel-expense modal
+  const [fuelEntries, setFuelEntries] = useState([]) // fuel expenses for current usage
 
   const loadCar = useCallback(async () => {
     const [c, m, d] = await Promise.all([
@@ -57,6 +63,16 @@ export default function VehicleDetailPage() {
     setCar(c)
     setMaintenance(m)
     setDocuments(d)
+    // Fuel expenses for the active usage session (for the balance + list).
+    if (c && c.status === 'in_use' && c.current_usage_id) {
+      try {
+        setFuelEntries(await getFuelExpensesForUsage(c.current_usage_id, { force: true }))
+      } catch {
+        setFuelEntries([])
+      }
+    } else {
+      setFuelEntries([])
+    }
     return c
   }, [carId])
 
@@ -100,8 +116,9 @@ export default function VehicleDetailPage() {
   )
 
   // Taking a car: a driver may hold at most 2 at once, and taking a 2nd requires
-  // confirmation (spec — max 2 cars). Check what the user already drives, then either
-  // block (already at 2), ask to confirm (has 1), or take straight away (has none).
+  // confirmation (max 2 cars). Check what the user already drives, then either block
+  // (already at 2), ask to confirm (has 1), or go straight to the take modal (has none).
+  // The take modal collects fuel money + safety-equipment before the actual take.
   async function onTake() {
     setActing(true)
     try {
@@ -128,19 +145,33 @@ export default function VehicleDetailPage() {
     } finally {
       setActing(false)
     }
-    await doTake()
+    setShowTake(true)
   }
 
-  async function doTake() {
-    setConfirmTake(null)
+  async function doTake({ fuelCashStart, equipment }) {
     setActing(true)
     try {
-      await takeCar(carId)
+      await takeCar(carId, { fuelCashStart, equipment })
+      setShowTake(false)
       showToast('Автомобилът е записан на ваше име.', 'success')
       await refresh()
     } catch (e) {
       showToast(e.message || 'Възникна проблем.', 'error')
       await refresh()
+    } finally {
+      setActing(false)
+    }
+  }
+
+  async function onAddFuel({ amount, notes }) {
+    setActing(true)
+    try {
+      await addFuelExpense({ carId, amount, notes })
+      setShowFuel(false)
+      showToast('Разходът за гориво е записан.', 'success')
+      await refresh()
+    } catch (e) {
+      showToast(e.message || 'Възникна проблем.', 'error')
     } finally {
       setActing(false)
     }
@@ -373,6 +404,61 @@ export default function VehicleDetailPage() {
       </div>
       )}
 
+      {/* Fuel money for the active usage session (§15–§20) */}
+      {!own && car.status === 'in_use' ? (
+        <section className="detail-section">
+          <div className="detail-section__head">
+            <h2 className="detail-section__title">Гориво</h2>
+            {isDriver || isAdmin ? (
+              <button
+                className="btn btn--ghost btn--sm"
+                onClick={() => setShowFuel(true)}
+                disabled={acting}
+              >
+                Добави разход за гориво
+              </button>
+            ) : null}
+          </div>
+
+          <div className="odo-grid">
+            <div className="odo-cell">
+              <div className="odo-cell__label">Налични при вземане</div>
+              <div className="odo-cell__value">
+                {car.fuel_cash_start == null ? '—' : formatEuro(car.fuel_cash_start)}
+              </div>
+            </div>
+            <div className="odo-cell">
+              <div className="odo-cell__label">Заредено</div>
+              <div className="odo-cell__value">{formatEuro(car.fuel_spent_total || 0)}</div>
+            </div>
+            <div className="odo-cell">
+              <div className="odo-cell__label">Остатък</div>
+              <div className="odo-cell__value">
+                {car.fuel_cash_remaining == null ? '—' : formatEuro(car.fuel_cash_remaining)}
+              </div>
+            </div>
+          </div>
+
+          {fuelEntries.length > 0 ? (
+            <ul className="fuel-list">
+              {fuelEntries
+                .slice()
+                .sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)))
+                .map((f) => (
+                  <li key={f.fuel_entry_id} className="fuel-item">
+                    <span className="fuel-item__who">{f.employee_name}</span>
+                    <span className="fuel-item__when">{formatStampBG(f.created_at)}</span>
+                    {f.notes ? <span className="fuel-item__note">{f.notes}</span> : null}
+                    <span className="fuel-item__amount">{formatEuro(f.amount)}</span>
+                  </li>
+                ))}
+            </ul>
+          ) : (
+            <div className="empty-state empty-state--sm">Няма записани зареждания.</div>
+          )}
+        </section>
+      ) : null}
+
       {/* Odometer & oil change — not applicable to the own car */}
       {!own ? (
         <section className="detail-section">
@@ -515,13 +601,31 @@ export default function VehicleDetailPage() {
         <ConfirmModal
           title="Вземане на втори автомобил"
           message={`В момента управлявате автомобил ${confirmTake.plate}. Сигурни ли сте, че искате да вземете и този автомобил?`}
-          confirmLabel="Да, вземи"
+          confirmLabel="Да, продължи"
           cancelLabel="Отказ"
           busyLabel="Обработва се…"
           danger={false}
           busy={acting}
-          onConfirm={doTake}
+          onConfirm={() => {
+            setConfirmTake(null)
+            setShowTake(true)
+          }}
           onClose={() => setConfirmTake(null)}
+        />
+      ) : null}
+      {showTake ? (
+        <TakeCarModal
+          onClose={() => setShowTake(false)}
+          onSubmit={doTake}
+          submitting={acting}
+        />
+      ) : null}
+      {showFuel ? (
+        <FuelExpenseModal
+          onClose={() => setShowFuel(false)}
+          onSubmit={onAddFuel}
+          submitting={acting}
+          remaining={car.fuel_cash_remaining}
         />
       ) : null}
     </div>

@@ -406,6 +406,7 @@ button {
 }
 .bottom-nav__link {
   flex: 1;
+  min-width: 0; /* allow labels to shrink/wrap instead of overflowing with 8 items */
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -2866,3 +2867,273 @@ textarea.input {
     scroll-behavior: auto !important;
   }
 }
+
+/* ============================================================================
+ * Orders / Payroll / Reports / Fuel  (Major Feature Update)
+ * ========================================================================== */
+
+/* Segmented tab switcher (worker-admins get both views) */
+.segmented {
+  display: inline-flex;
+  gap: 4px;
+  padding: 4px;
+  background: var(--surface-2);
+  border-radius: var(--radius-pill);
+  margin-bottom: 16px;
+}
+.segmented__btn {
+  border: none;
+  background: none;
+  color: var(--text-2);
+  font: inherit;
+  font-weight: 600;
+  padding: 8px 16px;
+  border-radius: var(--radius-pill);
+  cursor: pointer;
+  min-height: 40px;
+}
+.segmented__btn--active {
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: var(--shadow);
+}
+
+/* Week / day navigator */
+.weeknav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+.weeknav__label {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 700;
+  font-size: 15px;
+}
+
+/* Worker day cards */
+.day-cards {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+}
+@media (min-width: 640px) {
+  .day-cards { grid-template-columns: repeat(2, 1fr); }
+}
+@media (min-width: 1000px) {
+  .day-cards { grid-template-columns: repeat(3, 1fr); }
+}
+.day-card {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px 14px;
+  background: var(--surface);
+}
+.day-card--shift {
+  border-left: 4px solid var(--accent);
+  background: var(--accent-bg);
+}
+.day-card--off {
+  opacity: 0.72;
+}
+.day-card__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+.day-card__weekday { font-weight: 700; }
+.day-card__date { color: var(--text-2); font-size: 13px; }
+.day-card__shift {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+.day-card__loc { font-weight: 600; }
+.day-card__badge {
+  font-size: 12px;
+  font-weight: 700;
+  background: var(--accent);
+  color: #fff;
+  border-radius: var(--radius-pill);
+  padding: 2px 10px;
+}
+.day-card__none,
+.day-card__future {
+  color: var(--muted);
+  font-size: 14px;
+}
+.day-card__entry {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  align-items: end;
+  gap: 8px;
+}
+.day-card__pay { font-weight: 700; white-space: nowrap; padding-bottom: 10px; }
+.day-card__saved { margin-top: 8px; font-size: 13px; color: var(--ok); }
+.field--inline { margin-bottom: 0; }
+
+/* Payroll summary + lines */
+.payroll-summary {
+  margin-top: 18px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  background: var(--surface);
+}
+.payline {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--border-subtle);
+}
+.payline--total {
+  border-bottom: none;
+  font-weight: 800;
+  font-size: 17px;
+  padding-top: 10px;
+}
+.pay-status {
+  display: inline-block;
+  margin-top: 12px;
+  font-size: 13px;
+  font-weight: 700;
+  padding: 4px 12px;
+  border-radius: var(--radius-pill);
+}
+.pay-status--muted { background: var(--surface-2); color: var(--text-2); }
+.pay-status--accent { background: var(--accent-bg); color: var(--accent-dark); }
+.pay-status--ok { background: #e7f6ec; color: var(--ok); }
+.payroll-summary .btn { margin-top: 12px; }
+
+/* Admin payroll cards */
+.payroll-cards {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+}
+@media (min-width: 720px) {
+  .payroll-cards { grid-template-columns: repeat(2, 1fr); }
+}
+.payroll-card {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  background: var(--surface);
+}
+.payroll-card__name { font-weight: 800; font-size: 16px; margin-bottom: 8px; }
+.payroll-card__foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 12px;
+}
+.payroll-card__meta { margin-top: 8px; font-size: 12px; color: var(--muted); }
+
+/* Daily report */
+.report-head {
+  margin-bottom: 14px;
+}
+.report-head__worker { font-weight: 800; font-size: 18px; }
+.report-head__meta { color: var(--text-2); font-size: 14px; }
+.report-form {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  background: var(--surface);
+  margin-bottom: 14px;
+}
+.report-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+.report-row:last-child { border-bottom: none; }
+.report-row__label { font-weight: 600; }
+.report-row__input {
+  width: 96px;
+  text-align: right;
+  flex: 0 0 auto;
+}
+input.report-row__input { min-height: 40px; }
+.report-row--total {
+  font-weight: 800;
+  font-size: 17px;
+  background: var(--surface-2);
+}
+.report-row--sm { padding: 7px 0; border-bottom: 1px solid var(--border-subtle); }
+
+/* Admin report overview */
+.report-groups { display: grid; gap: 16px; }
+.report-group {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  background: var(--surface);
+}
+.report-group__title { font-size: 16px; font-weight: 800; margin: 0 0 10px; }
+.report-group__workers { display: grid; gap: 8px; margin-bottom: 14px; }
+.report-worker {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  color: var(--text);
+}
+.report-worker:hover { border-color: var(--accent); }
+.report-worker__total { font-weight: 800; color: var(--accent-dark); }
+.report-totals { border-top: 1px dashed var(--border); padding-top: 10px; }
+.report-totals__title { font-weight: 700; color: var(--text-2); margin-bottom: 4px; }
+
+/* Report receipt (admin drill-down) */
+.report-receipt__head { margin-bottom: 6px; }
+.report-receipt__meta { color: var(--text-2); font-size: 13px; }
+.report-receipt hr { border: none; border-top: 1px dashed var(--border); margin: 8px 0; }
+
+/* Safety-equipment checklist (take-car modal) */
+.equip-check { display: grid; gap: 8px; margin-top: 4px; }
+.equip-check__item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 15px;
+  padding: 6px 0;
+}
+.equip-check__item input { width: 20px; height: 20px; }
+
+/* Fuel list (vehicle detail + history) */
+.fuel-list { list-style: none; margin: 10px 0 0; padding: 0; display: grid; gap: 6px; }
+.fuel-item {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 2px 10px;
+  padding: 8px 10px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+}
+.fuel-item__who { font-weight: 600; }
+.fuel-item__when { color: var(--muted); font-size: 12px; }
+.fuel-item__note { grid-column: 1 / -1; color: var(--text-2); font-size: 13px; }
+.fuel-item__amount { font-weight: 800; align-self: center; }
+.usage-item__fuel { font-size: 13px; color: var(--text-2); margin-top: 4px; }
+.usage-item__missing { font-size: 13px; color: var(--danger); margin-top: 4px; font-weight: 600; }

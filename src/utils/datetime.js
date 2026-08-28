@@ -100,6 +100,21 @@ export function shiftISO(iso, days) {
   return isoDateFromParts(d)
 }
 
+// Monday (ISO) of the week containing `iso` — the week_start convention used by
+// availability, orders, fuel and payroll.
+export function mondayOfWeekISO(iso) {
+  const wd = weekdayIndex(iso) // 0=Sun..6=Sat
+  const diff = wd === 0 ? -6 : 1 - wd
+  return shiftISO(iso, diff)
+}
+
+// Compact "dd.mm – dd.mm" label for a Monday-started week, e.g. "26.08 – 01.09".
+export function weekRangeLabel(weekStart) {
+  if (!weekStart) return ''
+  const end = shiftISO(weekStart, 6)
+  return `${formatDateBG(weekStart).slice(0, 5)} – ${formatDateBG(end).slice(0, 5)}`
+}
+
 // Days remaining until an ISO date (from today, Sofia). Negative = expired.
 export function daysUntil(iso) {
   if (!iso) return null
