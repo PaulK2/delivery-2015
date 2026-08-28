@@ -38,7 +38,7 @@ var SESSION_TTL_DAYS = 30;
 // Bump on every meaningful backend change. Visible via doGet (open the /exec URL in a
 // browser) so you can confirm which code the DEPLOYED web app is actually running —
 // Apps Script serves the last DEPLOYED VERSION, not merely the saved script.
-var BACKEND_VERSION = '2026-08-28-schedule-trim';
+var BACKEND_VERSION = '2026-08-28-schedule-probe';
 
 // Each completed delivery order is worth this much toward the worker's weekly pay.
 var ORDER_RATE_EUR = 0.5;
@@ -1743,6 +1743,22 @@ function getScheduleRaw(params, ctx) {
       configured: false,
       rows: [],
       matrix: []
+    });
+  }
+
+  // Diagnostic probe: report the sheet's dimensions using cheap metadata (no cell read,
+  // so it can't 503 the way a full getDisplayValues() does). Lets us see why the full
+  // read is failing without pulling the whole grid.
+  if (params && params.probe === true) {
+    var ps = getScheduleSheetFromUrl(url);
+    if (!ps) return fail('schedule_load_failed');
+    return ok({
+      probe: true,
+      sheet_name: ps.getName(),
+      last_row: ps.getLastRow(),
+      last_col: ps.getLastColumn(),
+      max_rows: ps.getMaxRows(),
+      max_cols: ps.getMaxColumns()
     });
   }
 
