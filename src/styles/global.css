@@ -362,7 +362,8 @@ button {
   align-items: center;
   gap: 10px;
 }
-/* On narrow screens keep the top bar uncluttered. */
+/* On narrow screens keep the top bar uncluttered — the logged-in user's name stays
+   visible (just narrower/smaller) so it's always identifiable, even on mobile. */
 @media (max-width: 640px) {
   .app-header__title {
     display: none;
@@ -371,7 +372,8 @@ button {
     display: none;
   }
   .app-header__name {
-    display: none;
+    font-size: 12px;
+    max-width: 22vw;
   }
 }
 .app-header__name {
@@ -975,6 +977,37 @@ button {
   grid-area: hours;
   font-size: 13px;
   color: var(--text-2);
+}
+
+.location-panel__cars {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+}
+.location-panel__cars-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-2);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin: 0 0 8px;
+}
+.car-plate-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.car-plate-list__item {
+  font-family: monospace;
+  font-weight: 700;
+  font-size: 13px;
+  letter-spacing: 0.02em;
+  background: var(--surface-2);
+  border-radius: var(--radius-sm);
+  padding: 6px 10px;
 }
 
 /* Shift badges */

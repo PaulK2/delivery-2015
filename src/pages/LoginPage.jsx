@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate, Navigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext.jsx'
 import { getEmployeesForLogin } from '../services/auth/auth.js'
-import { CONFIG, APP_VERSION } from '../config/index.js'
+import { CONFIG } from '../config/index.js'
 import Spinner from '../components/Spinner.jsx'
 import Icon from '../components/Icon.jsx'
 
@@ -84,9 +84,6 @@ export default function LoginPage() {
           </span>
           <h1>{CONFIG.appName}</h1>
           <p className="login-card__org">вход:</p>
-          <p className="login-card__org" style={{ fontSize: '11px', opacity: 0.55 }}>
-            версия {APP_VERSION}
-          </p>
         </div>
 
         {loadError ? (

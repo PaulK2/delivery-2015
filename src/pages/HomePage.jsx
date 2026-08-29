@@ -5,6 +5,9 @@ import { useAuth } from '../context/AuthContext.jsx'
 import { todayISO, shiftISO, weekdayBG, formatDateBG, scheduleEntriesForDate } from '../utils/datetime.js'
 import { SHIFT_LABELS, shiftHours } from '../utils/shifts.js'
 import { hasSeenIntro, markIntroSeen } from '../utils/uiPrefs.js'
+import { getCars } from '../services/fleet/fleet.js'
+import { useAutoRefresh } from '../hooks/useAutoRefresh.js'
+import { CONFIG } from '../config/index.js'
 import LocationDetailPanel from '../components/LocationDetailPanel.jsx'
 import Modal from '../components/Modal.jsx'
 import Icon from '../components/Icon.jsx'
@@ -25,6 +28,20 @@ export default function HomePage() {
   const [date, setDate] = useState(todayISO())
   const [selectedId, setSelectedId] = useState(null)
   const [showIntro, setShowIntro] = useState(() => !hasSeenIntro())
+
+  // The map's "Коли" panel shows plates from the app's own Cars database (never the
+  // schedule sheet's free-text notes), so the fleet list is loaded here too.
+  const [cars, setCars] = useState([])
+  useEffect(() => {
+    let alive = true
+    getCars()
+      .then((list) => alive && setCars(list))
+      .catch(() => {})
+    return () => {
+      alive = false
+    }
+  }, [])
+  useAutoRefresh(() => getCars({ force: true }).then((list) => setCars(list)).catch(() => {}), CONFIG.autoRefreshMs)
 
   function dismissIntro() {
     markIntroSeen()
@@ -193,6 +210,7 @@ export default function HomePage() {
               location={selectedLocation}
               entries={entriesByLocation[selectedLocation.location_id] || []}
               date={date}
+              cars={cars}
               onClose={() => setSelectedId(null)}
             />
           ) : (

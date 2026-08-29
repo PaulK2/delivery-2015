@@ -14,9 +14,13 @@ be redeployed manually**, and a one-time migration run.
 4. In the Apps Script editor, select **`migrateAdminsAndAuth`** and **Run** once
    (approve permissions if asked). It is idempotent — safe to re-run. It:
    - adds the `password_hash` / `password_configured` columns if missing;
-   - gives the `admin` role to **ЦЕЦО, СИМО, ПАВЕЛ, В. ПЕТКОВ**, creating **ЦЕЦО**
-     and **СИМО** if they don't exist;
+   - gives the `admin` role to **ЦЕЦО, СИМО, ПАВЕЛ, В. ПЕТКОВ, Маги**, creating
+     **ЦЕЦО**, **СИМО** and **Маги** if they don't exist;
    - **deactivates + demotes** the generic `Администратор` account.
+
+   **Re-run this after deploying the updated `Backend.gs`** to create **Маги** as a
+   new full admin (same rights as ЦЕЦО — review-only, not a worker-admin). She gets
+   no password yet, so her first login goes through the normal "Създайте парола" setup.
    It does NOT wipe passwords: a user with no password (blank flag) is taken through
    first-login setup automatically; anyone who already set one keeps it.
 5. Check the execution **log** for the "Promoted/Created/Retired" lines.

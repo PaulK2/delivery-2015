@@ -1,7 +1,22 @@
 import { useEffect, useMemo, useState } from 'react'
-import { MapContainer, TileLayer, Marker, Popup, useMap, useMapEvents } from 'react-leaflet'
+import {
+  MapContainer,
+  TileLayer,
+  Marker,
+  Popup,
+  AttributionControl,
+  useMap,
+  useMapEvents,
+} from 'react-leaflet'
 import L from 'leaflet'
 import { CONFIG } from '../config/index.js'
+
+// Leaflet's default attribution prefix embeds a small Ukrainian flag icon ahead of the
+// "Leaflet" link. This is an internal operations tool (spec: stay politically neutral,
+// avoid symbols that could spark unrelated discussion among staff) — so the map supplies
+// its own prefix with just the required Leaflet credit, no flag, no replacement symbol.
+const ATTRIBUTION_PREFIX =
+  '<a href="https://leafletjs.com" title="A JS library for interactive maps">Leaflet</a>'
 
 // True on phone-sized screens (matches the 900px desktop breakpoint in global.css).
 function useIsMobile() {
@@ -105,8 +120,10 @@ export default function SofiaMap({ locations, countsByLocation, selectedId, onSe
         minZoom={CONFIG.map.minZoom}
         maxZoom={CONFIG.map.maxZoom}
         scrollWheelZoom
+        attributionControl={false}
         className="sofia-map"
       >
+        <AttributionControl position="bottomright" prefix={ATTRIBUTION_PREFIX} />
         <TileLayer url={CONFIG.map.tileUrl} attribution={CONFIG.map.tileAttribution} />
         <DragGate mobile={isMobile} active={dragActive} />
         <BackgroundClick onSelect={onSelect} />

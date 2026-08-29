@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext.jsx'
 import { NAV_ITEMS } from '../components/nav.js'
 import Icon from '../components/Icon.jsx'
 import { isLargeText, setLargeText } from '../utils/uiPrefs.js'
+import { APP_VERSION } from '../config/index.js'
 
 // Secondary destinations + settings, shown as big, clearly-labelled buttons so nothing
 // is a guess. This is the "Още" target from the bottom bar (mobile especially).
@@ -82,6 +83,13 @@ export default function MorePage() {
           <li><strong>Моята наличност</strong> — кажете кога можете да работите следващата седмица.</li>
         </ol>
       </section>
+
+      {isAdmin ? (
+        <section className="detail-section">
+          <h2 className="detail-section__title">За приложението</h2>
+          <p className="more-page__hint">версия {APP_VERSION}</p>
+        </section>
+      ) : null}
 
       {user ? (
         <button className="btn btn--ghost btn--block" onClick={logout}>

@@ -6,19 +6,31 @@ import {
   isOwnCarAssignment,
   SHIFT_BADGES,
 } from '../utils/shifts.js'
-import { resolveScheduleCar } from '../utils/vehicles.js'
 
-// Show only the registration plate from a free-text schedule car note (same rule as the
-// График page) — never the raw note or any surrounding words. Empty when there's no plate.
-const carPlate = (raw) => resolveScheduleCar(raw, [])?.plate || ''
+const nameKey = (s) => String(s || '').toLowerCase().replace(/\s+/g, '')
+
+// Plates of app-tracked cars ("Коли") currently checked out by staff scheduled at this
+// location — sourced exclusively from the Cars database (never the schedule sheet's
+// free-text car notes, which can be stale, abbreviated, or plain wrong).
+function carsForEntries(entries, cars) {
+  const staff = new Set((entries || []).map((e) => nameKey(e.employee_name)))
+  const plates = new Set()
+  for (const car of cars || []) {
+    if (car.status !== 'in_use') continue
+    if (!staff.has(nameKey(car.current_driver_name))) continue
+    if (car.registration) plates.add(car.registration)
+  }
+  return [...plates].sort()
+}
 
 // Location details panel (spec §8). Employees sorted full-day before evening.
-export default function LocationDetailPanel({ location, entries, date, onClose }) {
+export default function LocationDetailPanel({ location, entries, date, cars, onClose }) {
   if (!location) return null
 
   const sorted = [...entries].sort(
     (a, b) => shiftSortRank(a.shift_type) - shiftSortRank(b.shift_type)
   )
+  const carPlates = carsForEntries(entries, cars)
 
   return (
     <aside className="location-panel" aria-label={`Локация ${location.name}`}>
@@ -65,14 +77,24 @@ export default function LocationDetailPanel({ location, entries, date, onClose }
                     {' '}· {paymentWithOwnCarBonus(e.payment, e.car)}
                   </span>
                 ) : null}
-                {carPlate(e.car) ? (
-                  <span className="employee-row__car"> · {carPlate(e.car)}</span>
-                ) : null}
               </span>
             </li>
           ))}
         </ul>
       )}
+
+      {carPlates.length > 0 ? (
+        <div className="location-panel__cars">
+          <h3 className="location-panel__cars-title">Коли</h3>
+          <ul className="car-plate-list">
+            {carPlates.map((plate) => (
+              <li key={plate} className="car-plate-list__item">
+                {plate}
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
     </aside>
   )
 }
