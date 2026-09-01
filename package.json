@@ -3,12 +3,13 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
-  "description": "Internal fleet operations platform (delivery-2015). Bulgarian UI, Google Sheets + Apps Script backend.",
+  "description": "Internal fleet operations platform (delivery-2015). Bulgarian UI, Cloudflare Worker + D1 backend; the boss's weekly schedule stays a read-only Google Sheet.",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
     "preview": "npm run build && wrangler dev",
-    "deploy": "npm run build && wrangler deploy"
+    "deploy": "npm run build && wrangler deploy",
+    "test": "node --test"
   },
   "dependencies": {
     "leaflet": "^1.9.4",
