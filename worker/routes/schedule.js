@@ -2,7 +2,7 @@
 // matching Backend.gs section; actual fetch/parse/cache lives in lib/schedule.js.
 import { ok, fail } from '../lib/http.js'
 import { requireAuth, requireAdmin, getSetting, setSetting, audit } from '../lib/auth.js'
-import { extractSpreadsheetId, readScheduleMatrix, fetchScheduleMatrixForUrl } from '../lib/schedule.js'
+import { extractSpreadsheetId, readScheduleMatrix, fetchScheduleMatrixForUrl, looksLikeScheduleGrid } from '../lib/schedule.js'
 import { genId, nowStamp } from '../lib/util.js'
 
 const MAX_ARCHIVE_LINKS = 4
@@ -26,12 +26,15 @@ export async function setScheduleSource(params, ctx) {
   const url = String(params.url || '').trim()
   if (!extractSpreadsheetId(url)) return fail('validation')
 
-  // Confirm the sheet is actually reachable before saving the new source.
+  // Confirm the sheet is actually reachable BEFORE saving it as the new source — probe
+  // the candidate URL directly, not via settings, so a bad URL never overwrites (and
+  // breaks) the currently-working one.
+  const probe = await fetchScheduleMatrixForUrl(url, true)
+  if (probe.error) return fail(probe.error)
+  if (!looksLikeScheduleGrid(probe.matrix)) return fail('schedule_wrong_tab')
+
   await setSetting(db, 'current_schedule_sheet_url', url)
   if (params.tabName !== undefined) await setSetting(db, 'schedule_tab_name', params.tabName || '')
-
-  const probe = await readScheduleMatrix(db, true)
-  if (probe.error) return fail('schedule_load_failed')
 
   await audit(db, ctx.user, 'schedule_source_changed', 'settings', 'current_schedule_sheet_url', url)
   return ok({ url })
@@ -80,7 +83,8 @@ export async function saveScheduleArchiveLink(params, ctx) {
 
     // Confirm the sheet is actually reachable before saving.
     const probe = await fetchScheduleMatrixForUrl(url, true)
-    if (probe.error) return fail('schedule_load_failed')
+    if (probe.error) return fail(probe.error)
+    if (!looksLikeScheduleGrid(probe.matrix)) return fail('schedule_wrong_tab')
 
     await db.prepare('UPDATE schedule_archive SET label = ?, url = ? WHERE archive_id = ?').bind(label, url, link.archive_id).run()
     await audit(db, ctx.user, 'schedule_archive_updated', 'schedule_archive', link.archive_id, label)
@@ -91,7 +95,8 @@ export async function saveScheduleArchiveLink(params, ctx) {
   if ((count?.n || 0) >= MAX_ARCHIVE_LINKS) return fail('archive_limit', { limit: MAX_ARCHIVE_LINKS })
 
   const probe = await fetchScheduleMatrixForUrl(url, true)
-  if (probe.error) return fail('schedule_load_failed')
+  if (probe.error) return fail(probe.error)
+  if (!looksLikeScheduleGrid(probe.matrix)) return fail('schedule_wrong_tab')
 
   const id = genId('SCA')
   await db

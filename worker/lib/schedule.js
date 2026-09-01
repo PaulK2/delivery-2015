@@ -6,6 +6,17 @@ import { getSetting } from './auth.js'
 
 const SCHEDULE_CACHE_TTL_SEC = 1800 // 30 min — mirrors the old Apps Script cache
 
+// Cheap sanity check that a fetched matrix is actually the weekly schedule grid, not
+// some other tab in the spreadsheet — a real, observed mistake: a generic "Share" link
+// (…?usp=drivesdk, no gid) silently defaults to gid=0, which can be any other tab (a
+// summary/fines sheet, say). That still fetches fine (200, valid CSV) and "succeeds"
+// with zero parsed entries, which looks exactly like a broken read from the outside.
+// Per the documented grid format, row 1 / column A is always literally "ДАТА".
+export function looksLikeScheduleGrid(matrix) {
+  const first = String(matrix?.[0]?.[0] || '').trim().toUpperCase()
+  return first === 'ДАТА'
+}
+
 export function extractSpreadsheetId(url) {
   if (!url) return null
   const m = String(url).match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/)
@@ -139,7 +150,25 @@ export async function fetchScheduleMatrixForUrl(url, forceRefresh) {
   }
   if (!res.ok) return { error: 'schedule_load_failed' }
 
+  // A sheet that isn't shared "Anyone with the link: Viewer" doesn't 404/403 here —
+  // Google redirects an unauthenticated request to a sign-in (or "request access")
+  // HTML page and answers 200 OK, so a plain res.ok check alone can't tell the two
+  // apart. That page is silently parsed as "CSV" otherwise: a technically successful
+  // read that produces an empty/garbage grid, which is exactly the "says success but
+  // nothing shows up" failure mode this exists to catch. A real successful export
+  // redirects to a googleusercontent.com URL (confirmed by hand — do NOT check the
+  // final host) and always comes back as text/csv; a sign-in/access-denied page comes
+  // back as text/html.
+  const contentType = res.headers.get('content-type') || ''
+  if (!contentType.includes('csv')) {
+    return { error: 'schedule_access_denied' }
+  }
+
   const text = await res.text()
+  if (/^\s*<(!doctype html|html)/i.test(text)) {
+    return { error: 'schedule_access_denied' }
+  }
+
   const matrix = trimScheduleMatrix(parseCSV(text))
   const result = { configured: true, matrix, sheet_name: '' }
 

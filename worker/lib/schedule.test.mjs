@@ -69,7 +69,10 @@ test('fetchScheduleMatrixForUrl makes exactly one plain GET request, no body, to
       method: (init && init.method) || 'GET',
       hasBody: !!(init && init.body),
     })
-    return new Response('ДАТА,ПИРИН\n24,ИВАН\n', { status: 200 })
+    return new Response('ДАТА,ПИРИН\n24,ИВАН\n', {
+      status: 200,
+      headers: { 'Content-Type': 'text/csv; charset=utf-8' }, // matches Google's real header (verified by hand)
+    })
   }
 
   try {
@@ -87,6 +90,29 @@ test('fetchScheduleMatrixForUrl makes exactly one plain GET request, no body, to
     // Never the authenticated write-capable API, and never a values-write path.
     assert.ok(!call.url.includes('googleapis.com'))
     assert.ok(!call.url.includes('/values/'))
+  } finally {
+    globalThis.fetch = realFetch
+    globalThis.caches = realCaches
+  }
+})
+
+test('a sheet not shared "Anyone with the link" is reported as an error, not a silent empty success', async () => {
+  // A private sheet doesn't 404/403 here — Google answers 200 with a sign-in/access
+  // page. Confirmed by hand: a real successful export always comes back as text/csv;
+  // this is what the failure case actually looks like, not a guess.
+  const realFetch = globalThis.fetch
+  const realCaches = globalThis.caches
+  globalThis.caches = { default: { match: async () => undefined, put: async () => {} } }
+  globalThis.fetch = async () =>
+    new Response('<!doctype html><html><body>Sign in to continue</body></html>', {
+      status: 200,
+      headers: { 'Content-Type': 'text/html; charset=utf-8' },
+    })
+
+  try {
+    const result = await fetchScheduleMatrixForUrl('https://docs.google.com/spreadsheets/d/FAKE_SHEET_ID/edit?gid=1', true)
+    assert.equal(result.error, 'schedule_access_denied')
+    assert.notEqual(result.configured, true) // never silently "succeeds" with an empty/garbage grid
   } finally {
     globalThis.fetch = realFetch
     globalThis.caches = realCaches
