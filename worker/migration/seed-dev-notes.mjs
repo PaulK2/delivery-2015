@@ -1,6 +1,8 @@
-// One-time seed: backfills the private dev changelog (dev_notes) with a summary per
-// work day, reconstructed from git history, plus today's Worker+D1 migration work.
-// Attributed to ПАВЕЛ per the request that added this feature. Run once:
+// One-time seed (idempotent upsert by note_id): backfills the private dev changelog
+// (dev_notes) with a summary per work day, reconstructed from git history, plus this
+// session's Worker+D1 migration work. Attributed to ПАВЕЛ per the request that added
+// this feature. In English on purpose — Dev Notes is the two devs' own private space,
+// unlike the rest of the (Bulgarian) app. Run:
 //   node worker/migration/seed-dev-notes.mjs > worker/migration/dev-notes-seed.sql
 //   npx wrangler d1 execute fleetview-db --local --file=worker/migration/dev-notes-seed.sql
 //   npx wrangler d1 execute fleetview-db --remote --file=worker/migration/dev-notes-seed.sql
@@ -12,31 +14,31 @@ const notes = [
     created_at: '2026-08-27T18:00:00',
     app_version: '',
     content:
-      'Първоначално изграждане: React/Vite скелет, вход, карта на София, четене на седмичния график (grid), Автомобили (списък, вземане/освобождаване, история), Моята наличност (матрица + преглед на екипа), Сигнали и поддръжка, Документи (застраховка, ГТП, предупреждения), администраторски панел (служители, автомобили, локации), Cloudflare конфигурация, парола системи (първо само за админи, после за всички — мин. 6 символа), евро вместо друга валута, оптимизации (кеширане, code-splitting, thumbnail снимки).',
+      'Initial build-out: React/Vite scaffold, login, Sofia map, weekly schedule grid parsing, Автомобили (fleet list, take/release, usage history), Моята наличност (availability matrix + team overview), Сигнали и поддръжка (maintenance: report/resolve), Документи (insurance, annual inspection, expiry warnings), admin panel (employees, vehicles, locations), Cloudflare config, password system (admins first, then everyone — min 6 characters), switched displayed currency to euro, performance work (caching, code-splitting, thumbnail images).',
   },
   {
     created_at: '2026-08-28T18:00:00',
     app_version: '',
     content:
-      'ПАВЕЛ и В. ПЕТКОВ вече могат да подават собствена наличност (worker-admin изключение). Поправка на "залепнал" фронтенд (network-first service worker). Видима версия на билда (лог. екран + конзола). Подобрения по графика (сгъваеми дни, дати). Лимит от 2 коли наведнъж. Разкриване на парола при въвеждане. Добавени Поръчки + Заплати, Отчет (доставки по стойност, няколко на категория), проследяване на гориво и проверка на обезопасителна екипировка. Поправки на надеждността при четене на графика (503 грешки, кеширане, съкращаване на празни редове/колони).',
+      'ПАВЕЛ and В. ПЕТКОВ can now submit their own availability (worker-admin exception). Fixed a stale-frontend bug (network-first service worker for the app shell). Build version now visible (login screen + console). Schedule improvements (collapsible days, dates shown). 2-car limit per driver. Password reveal toggle on login. Added Поръчки + Заплати (orders/payroll), Отчет (value-based deliveries, several per category), fuel expense tracking and safety-equipment checks. Fixed schedule reliability (503 errors, caching, trimming empty rows/columns).',
   },
   {
     created_at: '2026-08-29T18:00:00',
     app_version: '',
     content:
-      'Опростяване на интерфейса за възрастни/неопитни потребители. Наличността вече е отворена за цялата седмица + превключвател "изглед на работник" за worker-admins. "Още" вече и в десктоп страничното меню. Safe-area за долното меню на телефон. Версията на билда вече се вижда само от админи. Логнатият потребител вече се вижда и на мобилен изглед. Премахнато украинското флагче от картата (Leaflet атрибуция) — приложението е вътрешен инструмент, трябва да остане неутрално. "Коли" на картата вече идва изцяло от базата с автомобили, не от текста в графика. Добавен админ МАГИ (пълни права като ЦЕЦО).',
+      'Simplified the UI for older/less tech-savvy users. Availability is now open the whole week + a "view as worker" toggle for worker-admins. "Още" (More) now reachable from the desktop side nav too. Safe-area padding so the mobile bottom nav can\'t hide content. Build version now shown to admins only. The logged-in user is now visible on mobile too. Removed the Ukrainian flag from the map attribution (Leaflet) — this is an internal ops tool, should stay politically neutral. The map\'s "Коли" (cars) section now comes entirely from the Cars database, not schedule text. Added admin МАГИ (full rights, same as ЦЕЦО).',
   },
   {
     created_at: '2026-09-01T12:00:00',
     app_version: 'worker-d1-2026-09-01',
     content:
-      'Голяма промяна: преместихме целия оперативен бекенд от Google Sheets/Apps Script на Cloudflare Worker + D1 — 42 действия пренаписани 1:1 (вход, служители, локации, автомобили вкл. вземане/освобождаване, поддръжка, документи, наличност, поръчки, гориво, отчети, заплати). Седмичният график на шефа си остава Google Sheet, само за четене — Worker-ът го чете през публичния CSV export на Google (открихме и коригирахме реален бъг: gviz endpoint-ът чупи двуредовото заглавие на графика — минахме на /export?format=csv, който съвпада точно с getDisplayValues()). Мигрирани 374 реда реални данни (служители, коли, история и т.н.), проверени ред по ред. Паролите бяха нулирани, а не мигрирани (нямаше активни потребители). Добавен архив на графика (до 4 стари седмични връзки, admin CRUD + преглед). Поправен таб "Архив" (не се показваше — препълване на лентата с табове на телефон). Преименувано МАГИ → МАГИ (главни букви, за консистентност). Добавен автоматичен тест, доказващ че графикът на шефа само се чете, никога не се пише.',
+      'Big one: moved the entire operational backend from Google Sheets/Apps Script to a Cloudflare Worker + D1 — 42 actions rewritten 1:1 (login, employees, locations, cars incl. take/release, maintenance, documents, availability, orders, fuel, reports, payroll). The boss\'s weekly schedule stays a read-only Google Sheet — the Worker fetches it via Google\'s public CSV export (found and fixed a real bug: the gviz endpoint breaks the schedule\'s two-row header — switched to /export?format=csv, which matches getDisplayValues() exactly). Migrated 374 rows of real data (employees, cars, history, etc.), verified row by row. Passwords were reset, not migrated (no active users yet). Added a schedule archive (up to 4 old weekly links, admin CRUD + viewer). Fixed the "Архив" tab not showing (mobile tab-bar overflow). Renamed МАГИ → МАГИ (uppercase, for consistency). Added an automated test proving the boss\'s schedule is read-only, never written to.',
   },
   {
     created_at: '2026-09-01T22:00:00',
     app_version: 'ui-2026-09-01-schedule-archive',
     content:
-      'Добавено "Присвои по днешния график" в Автомобили (админ): еднократно действие за първоначалното активиране — присвоява всяка кола от днешния график на съответния служител (все едно я е взел ръчно), а непозната регистрация автоматично създава нова кола, маркирана ❓ "За преглед" (маркировката пада при първото редактиране от админ). След това вземане/освобождаване са си напълно ръчни както обичайно — това е само за да не се въвежда всичко на ръка при първия старт. И — този раздел ("Dev Notes") — виждат го само ПАВЕЛ и В. ПЕТКОВ, дори другите админи нямат достъп; всяка бележка помни версията на билда, с която е писана.',
+      'Added "Присвои по днешния график" (Автомобили, admin): a one-time initial-activation action — assigns every car from today\'s schedule to the matching employee (as if formally taken), and an unrecognized plate auto-creates a new car flagged ❓ "needs review" (the flag clears the first time an admin edits it). After that, take/release stay fully manual as before — this is only to avoid entering everything by hand on day one. And — this "Dev Notes" tab itself — visible only to ПАВЕЛ and В. ПЕТКОВ, not even other admins; every note remembers the app version it was written against.',
   },
 ]
 
@@ -47,6 +49,9 @@ function esc(s) {
 let sql = ''
 for (const n of notes) {
   const id = 'DEVN-' + n.created_at.replace(/[^0-9]/g, '')
-  sql += `INSERT INTO dev_notes (note_id, author_id, author_name, content, app_version, created_at) VALUES ('${id}', '${AUTHOR_ID}', '${esc(AUTHOR_NAME)}', '${esc(n.content)}', '${esc(n.app_version)}', '${n.created_at}');\n`
+  sql +=
+    `INSERT INTO dev_notes (note_id, author_id, author_name, content, app_version, created_at) VALUES ` +
+    `('${id}', '${AUTHOR_ID}', '${esc(AUTHOR_NAME)}', '${esc(n.content)}', '${esc(n.app_version)}', '${n.created_at}') ` +
+    `ON CONFLICT(note_id) DO UPDATE SET content = excluded.content, app_version = excluded.app_version;\n`
 }
 console.log(sql)

@@ -6,7 +6,8 @@ import Spinner from '../Spinner.jsx'
 
 // Private changelog for ПАВЕЛ / В. ПЕТКОВ only (enforced by the backend on every
 // route here — not just this tab being hidden from other admins). When either posts
-// an update, the other sees it here, tagged with the app version at the time.
+// an update, the other sees it here, tagged with the app version at the time. English
+// on purpose — this tab is the two devs' own space, unlike the rest of the app (Bulgarian).
 export default function AdminDevNotes() {
   const { user } = useAuth()
   const { showToast } = useToast()
@@ -20,7 +21,7 @@ export default function AdminDevNotes() {
     try {
       setList(await getDevNotes())
     } catch (e) {
-      setError(e.message || 'Грешка при зареждане.')
+      setError(e.message || 'Failed to load.')
     }
   }
   useEffect(() => {
@@ -35,7 +36,7 @@ export default function AdminDevNotes() {
       setDraft('')
       await load()
     } catch (e) {
-      showToast(e.message || 'Възникна проблем.', 'error')
+      showToast(e.message || 'Something went wrong.', 'error')
     } finally {
       setPosting(false)
     }
@@ -46,17 +47,17 @@ export default function AdminDevNotes() {
       await deleteDevNote(noteId)
       await load()
     } catch (e) {
-      showToast(e.message || 'Възникна проблем.', 'error')
+      showToast(e.message || 'Something went wrong.', 'error')
     }
   }
 
-  if (list === null) return error ? <div className="banner banner--error">{error}</div> : <Spinner label="Зареждане…" />
+  if (list === null) return error ? <div className="banner banner--error">{error}</div> : <Spinner label="Loading…" />
 
   return (
     <div>
       <p className="admin-hint">
-        Вижда се само от ПАВЕЛ и В. ПЕТКОВ — нито другите админи, нито служителите имат
-        достъп до този раздел.
+        Visible only to ПАВЕЛ and В. ПЕТКОВ — no other admin, and no regular user, has
+        access to this tab.
       </p>
 
       <div className="dev-note-form">
@@ -64,16 +65,16 @@ export default function AdminDevNotes() {
           className="input dev-note-form__textarea"
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
-          placeholder="Какво промени/направи…"
+          placeholder="What changed / what you did…"
           rows={3}
         />
         <button className="btn btn--primary btn--sm" onClick={onPost} disabled={posting || !draft.trim()}>
-          {posting ? 'Публикуване…' : 'Публикувай'}
+          {posting ? 'Posting…' : 'Post'}
         </button>
       </div>
 
       {list.length === 0 ? (
-        <div className="empty-state empty-state--sm">Все още няма бележки.</div>
+        <div className="empty-state empty-state--sm">No notes yet.</div>
       ) : (
         <ul className="dev-notes-list">
           {list.map((n) => (
@@ -86,7 +87,7 @@ export default function AdminDevNotes() {
               <p className="dev-note__content">{n.content}</p>
               {n.author_id === user?.employee_id ? (
                 <button className="dev-note__delete" onClick={() => onDelete(n.note_id)}>
-                  Изтрий
+                  Delete
                 </button>
               ) : null}
             </li>
