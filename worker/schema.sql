@@ -76,7 +76,10 @@ CREATE TABLE IF NOT EXISTS cars (
   last_oil_change_odometer REAL,
   last_oil_change_date TEXT NOT NULL DEFAULT '',
   fuel_cash_start REAL,
-  fuel_spent_total REAL
+  fuel_spent_total REAL,
+  -- Set when a car is auto-created (plate seen in the schedule with no matching fleet
+  -- record) so an admin knows to fill in make/model/photo. Cleared on the next saveCar.
+  needs_review INTEGER NOT NULL DEFAULT 0
 );
 
 CREATE TABLE IF NOT EXISTS usage_history (
@@ -211,3 +214,16 @@ CREATE TABLE IF NOT EXISTS payroll (
   updated_at TEXT NOT NULL DEFAULT '',
   UNIQUE(employee_id, week_start)
 );
+
+-- Private dev changelog, visible only to the two named developer-admins (see
+-- DEV_NOTE_ADMINS in lib/auth.js) — not even other admins can see this table's data
+-- through the API (every route here is gated by requireDevNoteAccess, not requireAdmin).
+CREATE TABLE IF NOT EXISTS dev_notes (
+  note_id TEXT PRIMARY KEY,
+  author_id TEXT NOT NULL,
+  author_name TEXT NOT NULL,
+  content TEXT NOT NULL,
+  app_version TEXT NOT NULL DEFAULT '',
+  created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_dev_notes_created ON dev_notes(created_at);

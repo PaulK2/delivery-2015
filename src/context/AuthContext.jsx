@@ -41,6 +41,8 @@ export function AuthProvider({ children }) {
   // payment confirmation. True for regular staff and worker-admins (ПАВЕЛ, В. ПЕТКОВ),
   // false for review-only admins (ЦЕЦО, СИМО). Mirrors backend canSubmitAvailability.
   const isWorker = !!user?.can_submit_availability
+  // Private dev changelog — ПАВЕЛ / В. ПЕТКОВ only, not even other admins.
+  const canViewDevNotes = !!user?.can_view_dev_notes
   // Only worker-admins can flip between the two views.
   const canToggleView = isRealAdmin && isWorker
   // Effective admin flag the whole UI reads: a worker-admin viewing as a worker sees the
@@ -55,6 +57,7 @@ export function AuthProvider({ children }) {
     isAdmin,
     isRealAdmin,
     isWorker,
+    canViewDevNotes,
     canToggleView,
     viewAsWorker: viewAsWorker && canToggleView,
     setViewAsWorker,

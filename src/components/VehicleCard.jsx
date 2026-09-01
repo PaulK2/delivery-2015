@@ -22,7 +22,9 @@ export default function VehicleCard({ car }) {
             height="280"
           />
         ) : (
-          <span className="vehicle-card__noimg" aria-hidden="true">{own ? '🔑' : '🚗'}</span>
+          <span className="vehicle-card__noimg" aria-hidden="true">
+            {own ? '🔑' : car.needs_review ? '❓' : '🚗'}
+          </span>
         )}
         {maintenance ? (
           <span className="vehicle-card__warn" title="Активен проблем">⚠</span>

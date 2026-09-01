@@ -13,6 +13,7 @@ import * as orders from './orders.js'
 import * as fuel from './fuel.js'
 import * as reports from './reports.js'
 import * as payroll from './payroll.js'
+import * as devnotes from './devnotes.js'
 
 export const ROUTES = {
   // Authentication
@@ -56,6 +57,9 @@ export const ROUTES = {
   // Usage history
   getCarUsageHistory: cars.getCarUsageHistory,
 
+  // One-time initial-activation helper
+  bootstrapCarAssignments: cars.bootstrapCarAssignments,
+
   // Maintenance
   getMaintenance: maintenance.getMaintenance,
   reportIssue: maintenance.reportIssue,
@@ -91,4 +95,9 @@ export const ROUTES = {
   getMyPayroll: payroll.getMyPayroll,
   setPayrollPaid: payroll.setPayrollPaid,
   confirmPayrollReceived: payroll.confirmPayrollReceived,
+
+  // Private dev changelog (ПАВЕЛ / В. ПЕТКОВ only)
+  getDevNotes: devnotes.getDevNotes,
+  addDevNote: devnotes.addDevNote,
+  deleteDevNote: devnotes.deleteDevNote,
 }

@@ -3,7 +3,7 @@
 // single conditional UPDATE (see takeCar/releaseCar) instead of a global script lock.
 import { ok, fail } from '../lib/http.js'
 import { requireAuth, requireAdmin, audit } from '../lib/auth.js'
-import { genId, nowStamp, dateOnly, normalizeIsoDate, toNumberOrNull } from '../lib/util.js'
+import { genId, nowStamp, dateOnly, normalizeIsoDate, toNumberOrNull, normalizePlate } from '../lib/util.js'
 
 const OIL_CHANGE_INTERVAL_KM = 10000
 const SAFETY_EQUIPMENT_FIELDS = [
@@ -53,6 +53,7 @@ function serializeCar(car) {
     fuel_cash_start: start,
     fuel_spent_total: spent,
     fuel_cash_remaining: start == null ? null : start - spent,
+    needs_review: !!car.needs_review,
   }
 }
 
@@ -96,7 +97,7 @@ export async function saveCar(params, ctx) {
     await db
       .prepare(
         `UPDATE cars SET registration = ?, make = ?, model = ?, year = ?, image = ?, status = ?,
-         parked_location = ?, notes = ?, active = ? WHERE car_id = ?`
+         parked_location = ?, notes = ?, active = ?, needs_review = 0 WHERE car_id = ?`
       )
       .bind(
         car.registration,
@@ -327,4 +328,90 @@ export async function getCarUsageHistory(params, ctx) {
     has_safety_vest: !!row.has_safety_vest,
   }))
   return ok({ history })
+}
+
+// One-time initial-activation helper (admin-triggered, not automatic/recurring): the
+// client resolves today's schedule car notes to {employeeId, employeeName, plate}
+// (reusing the same fuzzy plate matching the График page already uses) and this takes
+// each car exactly as if the employee had formally taken it — no fuel-cash amount is
+// known for a backfill, so fuel_cash_start stays null; a usage_history row is still
+// created so the normal release flow works afterward. A plate with no matching car
+// creates one (active, needs_review — an admin fills in make/model/photo later). Cars
+// already in_use for someone ELSE are left alone and reported, never overwritten.
+export async function bootstrapCarAssignments(params, ctx) {
+  const notAdmin = requireAdmin(ctx)
+  if (notAdmin) return notAdmin
+
+  const db = ctx.env.DB
+  const assignments = Array.isArray(params.assignments) ? params.assignments : []
+  if (!assignments.length) return fail('validation')
+
+  const assigned = []
+  const created = []
+  const skipped = []
+
+  for (const a of assignments) {
+    const plate = normalizePlate(a.plate)
+    const employeeId = String(a.employeeId || '')
+    const employeeName = String(a.employeeName || '')
+    if (!plate || !employeeId) {
+      skipped.push({ plate: a.plate || '', employeeName, reason: 'invalid' })
+      continue
+    }
+
+    let car = await db.prepare('SELECT * FROM cars WHERE registration = ?').bind(plate).first()
+    let wasCreated = false
+
+    if (!car) {
+      const id = genId('CAR')
+      await db
+        .prepare(
+          `INSERT INTO cars (car_id, registration, make, model, year, image, status,
+           current_driver_id, current_driver_name, current_usage_id, parked_location, notes, active, needs_review)
+           VALUES (?, ?, '', '', '', '', 'available', '', '', '', '', '', 1, 1)`
+        )
+        .bind(id, plate)
+        .run()
+      car = await db.prepare('SELECT * FROM cars WHERE car_id = ?').bind(id).first()
+      wasCreated = true
+      await audit(db, ctx.user, 'car_created', 'car', id, plate + ' · автоматично добавена от графика, нуждае се от преглед')
+    }
+
+    if (String(car.status) === 'in_use') {
+      if (String(car.current_driver_id) === employeeId) {
+        skipped.push({ plate, employeeName, reason: 'already_assigned' })
+      } else {
+        skipped.push({ plate, employeeName, reason: 'taken_by_other', currentDriver: car.current_driver_name })
+      }
+      continue
+    }
+
+    const usageId = genId('USE')
+    const startedAt = nowStamp()
+    const claim = await db
+      .prepare(
+        `UPDATE cars SET status = 'in_use', current_driver_id = ?, current_driver_name = ?, current_usage_id = ?
+         WHERE car_id = ? AND status = 'available'`
+      )
+      .bind(employeeId, employeeName, usageId, car.car_id)
+      .run()
+    if (!claim.meta.changes) {
+      skipped.push({ plate, employeeName, reason: 'race' })
+      continue
+    }
+
+    await db
+      .prepare(
+        `INSERT INTO usage_history (usage_id, car_id, registration, employee_id, employee_name, start_at, notes)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`
+      )
+      .bind(usageId, car.car_id, car.registration, employeeId, employeeName, startedAt, 'Присвоено по график при първоначално активиране на приложението')
+      .run()
+
+    await audit(db, ctx.user, 'car_taken', 'car', car.car_id, car.registration + ' · присвоено на ' + employeeName + ' по график (първоначално активиране)')
+
+    ;(wasCreated ? created : assigned).push({ car_id: car.car_id, plate, employeeName })
+  }
+
+  return ok({ assigned, created, skipped })
 }

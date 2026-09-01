@@ -15,3 +15,4 @@ dist/
 # one-time D1 migration artifacts — contain password hashes, never committed
 fleet-export-*.json
 worker/migration/import.sql
+worker/migration/dev-notes-seed.sql

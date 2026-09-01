@@ -2405,6 +2405,70 @@ textarea.input {
   margin: 0 0 12px;
 }
 
+/* Dev notes (private changelog) */
+.dev-note-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+.dev-note-form__textarea {
+  resize: vertical;
+  min-height: 64px;
+  font-family: inherit;
+}
+.dev-notes-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.dev-note {
+  background: var(--surface-2);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+}
+.dev-note__head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 4px;
+}
+.dev-note__author {
+  font-weight: 700;
+  color: var(--accent);
+  font-size: 13px;
+}
+.dev-note__date {
+  color: var(--muted);
+  font-size: 12px;
+}
+.dev-note__version {
+  font-family: monospace;
+  font-size: 11px;
+  color: var(--muted);
+  background: var(--surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: 999px;
+  padding: 1px 8px;
+}
+.dev-note__content {
+  margin: 0;
+  font-size: 14px;
+  white-space: pre-wrap;
+}
+.dev-note__delete {
+  background: none;
+  border: none;
+  color: var(--danger-text);
+  font-size: 12px;
+  cursor: pointer;
+  padding: 6px 0 0;
+}
+
 .admin-toolbar {
   display: flex;
   align-items: center;
@@ -2482,6 +2546,10 @@ textarea.input {
   background: var(--surface-2);
   color: var(--muted);
   border: 1px solid var(--border-subtle);
+}
+.tag--warn {
+  background: var(--warning-bg);
+  color: var(--warning-text);
 }
 .tag--ok {
   background: var(--success-bg);

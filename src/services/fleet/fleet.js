@@ -89,6 +89,16 @@ export async function deleteCar(carId) {
   return res
 }
 
+// One-time initial-activation helper (admin-triggered, not automatic): takes each
+// {employeeId, employeeName, plate} pair exactly as if that employee had formally
+// taken the car (no fuel-cash amount is known for a backfill). A plate with no
+// matching car creates one, flagged needs_review for an admin to complete later.
+export async function bootstrapCarAssignments(assignments) {
+  const res = await api('bootstrapCarAssignments', { assignments })
+  invalidateFleet()
+  return res
+}
+
 // Take a vehicle. Backend re-checks availability under a lock and prevents double
 // reservation (spec §30, §31). `fuelCashStart` (cash for fuel in the vehicle documents)
 // is required; `equipment` records the safety-equipment check (§17, §22).

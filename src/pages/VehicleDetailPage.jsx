@@ -301,7 +301,9 @@ export default function VehicleDetailPage() {
           {photo ? (
             <img src={photo} alt={carTitle(car)} />
           ) : (
-            <span className="vehicle-hero__noimg" aria-hidden="true">{own ? '🔑' : '🚗'}</span>
+            <span className="vehicle-hero__noimg" aria-hidden="true">
+              {own ? '🔑' : car.needs_review ? '❓' : '🚗'}
+            </span>
           )}
         </div>
         <div className="vehicle-hero__info">
@@ -311,6 +313,11 @@ export default function VehicleDetailPage() {
           <div className="vehicle-hero__status">
             <StatusBadge status={car.status} />
             {oil.due ? <span className="oil-badge" title="Нужна е смяна на масло">🛢 Масло</span> : null}
+            {car.needs_review ? (
+              <span className="oil-badge" title="Автоматично добавена — довършете регистрацията (марка, модел, снимка)">
+                ❓ За преглед
+              </span>
+            ) : null}
           </div>
           {car.status === 'in_use' && car.current_driver_name ? (
             <div className="vehicle-hero__meta">👤 <span className="who-name">{car.current_driver_name}</span></div>

@@ -8,6 +8,10 @@ export const MIN_PASSWORD_LEN = 6
 // Same real-named-admin model as Backend.gs (spec: no shared admin account).
 export const AVAILABILITY_WORKER_ADMINS = ['ПАВЕЛ', 'В. ПЕТКОВ']
 
+// The private dev changelog (dev_notes) is visible ONLY to these two named admins —
+// not even other admins (ЦЕЦО, СИМО, МАГИ) can see it.
+export const DEV_NOTE_ADMINS = ['ПАВЕЛ', 'В. ПЕТКОВ']
+
 // SHA-256(salt + password) hex — byte-for-byte the same algorithm Apps Script used
 // (Utilities.computeDigest(SHA_256, salt+password)), so migrated password_hash values
 // (and the copied-over PIN_SALT secret) keep every existing password working.
@@ -30,12 +34,21 @@ export function canSubmitAvailability(user) {
   return AVAILABILITY_WORKER_ADMINS.some((n) => nameKeyBG(n) === nameKeyBG(user.name))
 }
 
+// Whether a user may see/write the private dev changelog — the two named developer-
+// admins only, regardless of role (matches the "ПАВЕЛ"/"В. ПЕТКОВ" identity check used
+// for worker-admin capabilities, kept separate since the two lists could diverge later).
+export function canViewDevNotes(user) {
+  if (!user) return false
+  return DEV_NOTE_ADMINS.some((n) => nameKeyBG(n) === nameKeyBG(user.name))
+}
+
 export function publicUser(employee) {
   return {
     employee_id: employee.employee_id,
     name: employee.name,
     role: employee.role || 'employee',
     can_submit_availability: canSubmitAvailability(employee),
+    can_view_dev_notes: canViewDevNotes(employee),
   }
 }
 
@@ -91,6 +104,13 @@ export function requireAdmin(ctx) {
 export function requireWorker(ctx) {
   if (!ctx.user) return fail('unauthorized')
   if (!canSubmitAvailability(ctx.user)) return fail('forbidden')
+  return null
+}
+
+// Guard for the private dev changelog — ПАВЕЛ / В. ПЕТКОВ only, not other admins.
+export function requireDevNoteAccess(ctx) {
+  if (!ctx.user) return fail('unauthorized')
+  if (!canViewDevNotes(ctx.user)) return fail('forbidden')
   return null
 }
 

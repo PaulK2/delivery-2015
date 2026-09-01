@@ -7,8 +7,9 @@ import AdminVehicles from '../components/admin/AdminVehicles.jsx'
 import AdminLocations from '../components/admin/AdminLocations.jsx'
 import AdminPasswords from '../components/admin/AdminPasswords.jsx'
 import AdminScheduleArchive from '../components/admin/AdminScheduleArchive.jsx'
+import AdminDevNotes from '../components/admin/AdminDevNotes.jsx'
 
-const TABS = [
+const BASE_TABS = [
   { key: 'dashboard', label: 'Табло', C: AdminDashboard },
   { key: 'employees', label: 'Служители', C: AdminEmployees },
   { key: 'passwords', label: 'Пароли', C: AdminPasswords },
@@ -16,9 +17,12 @@ const TABS = [
   { key: 'locations', label: 'Локации', C: AdminLocations },
   { key: 'scheduleArchive', label: 'Архив', C: AdminScheduleArchive },
 ]
+// Private dev changelog — only shown to ПАВЕЛ / В. ПЕТКОВ (backend also enforces this
+// on every dev-notes route, so hiding the tab is a UX nicety, not the real gate).
+const DEV_NOTES_TAB = { key: 'devNotes', label: 'Dev Notes', C: AdminDevNotes }
 
 export default function AdminPage() {
-  const { isAdmin } = useAuth()
+  const { isAdmin, canViewDevNotes } = useAuth()
   const [tab, setTab] = useState('dashboard')
 
   if (!isAdmin) {
@@ -30,6 +34,7 @@ export default function AdminPage() {
     )
   }
 
+  const TABS = canViewDevNotes ? [...BASE_TABS, DEV_NOTES_TAB] : BASE_TABS
   const Active = TABS.find((t) => t.key === tab)?.C || AdminDashboard
 
   return (
