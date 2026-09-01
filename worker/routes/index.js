@@ -38,6 +38,12 @@ export const ROUTES = {
   getScheduleSource: schedule.getScheduleSource,
   setScheduleSource: schedule.setScheduleSource,
 
+  // Schedule archive (admin — past weeks' schedule links)
+  getScheduleArchive: schedule.getScheduleArchive,
+  saveScheduleArchiveLink: schedule.saveScheduleArchiveLink,
+  deleteScheduleArchiveLink: schedule.deleteScheduleArchiveLink,
+  getArchivedScheduleRaw: schedule.getArchivedScheduleRaw,
+
   // Cars
   getCars: cars.getCars,
   getCar: cars.getCar,

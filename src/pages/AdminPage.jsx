@@ -6,6 +6,7 @@ import AdminEmployees from '../components/admin/AdminEmployees.jsx'
 import AdminVehicles from '../components/admin/AdminVehicles.jsx'
 import AdminLocations from '../components/admin/AdminLocations.jsx'
 import AdminPasswords from '../components/admin/AdminPasswords.jsx'
+import AdminScheduleArchive from '../components/admin/AdminScheduleArchive.jsx'
 
 const TABS = [
   { key: 'dashboard', label: 'Табло', C: AdminDashboard },
@@ -13,6 +14,7 @@ const TABS = [
   { key: 'passwords', label: 'Пароли', C: AdminPasswords },
   { key: 'vehicles', label: 'Автомобили', C: AdminVehicles },
   { key: 'locations', label: 'Локации', C: AdminLocations },
+  { key: 'scheduleArchive', label: 'Архив график', C: AdminScheduleArchive },
 ]
 
 export default function AdminPage() {

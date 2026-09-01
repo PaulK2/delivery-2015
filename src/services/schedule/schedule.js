@@ -48,3 +48,29 @@ export async function setScheduleSource(url, tabName) {
 export async function getScheduleSource() {
   return api('getScheduleSource', {})
 }
+
+/* ------------------------- schedule archive (admin) ------------------------- */
+// A small rolling set of past schedule sheet links (e.g. the last ~4 weeks), so an old
+// week's grid can still be looked up after the boss moves on to a new sheet. Entirely
+// separate from the live source above — never affects the Home map or "current" view.
+
+export async function getScheduleArchive() {
+  const { archive } = await api('getScheduleArchive', {})
+  return archive
+}
+
+export async function saveScheduleArchiveLink(link) {
+  return api('saveScheduleArchiveLink', { link })
+}
+
+export async function deleteScheduleArchiveLink(archiveId) {
+  return api('deleteScheduleArchiveLink', { archiveId })
+}
+
+// Fetches + parses one archived link's grid on demand. Returns the same shape as
+// getSchedule() (entries/locationNames/configured) plus the link's label.
+export async function getArchivedSchedule(archiveId, { refresh } = {}) {
+  const data = await api('getArchivedScheduleRaw', { archiveId, refresh: refresh || undefined })
+  const { entries, locationNames } = parseScheduleMatrix(data.matrix || [])
+  return { entries, locationNames, label: data.label || '' }
+}

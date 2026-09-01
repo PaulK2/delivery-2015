@@ -111,13 +111,11 @@ function trimScheduleMatrix(matrix) {
   return out
 }
 
-// Fetches + parses the configured schedule sheet, using the edge Cache API to avoid
-// re-fetching Google on every 45s auto-refresh from every user (mirrors the old
-// server-side TTL cache). `forceRefresh` (admin "refresh" button) bypasses it.
-export async function readScheduleMatrix(db, forceRefresh) {
-  const url = await getSetting(db, 'current_schedule_sheet_url')
-  if (!url) return { configured: false, matrix: [], sheet_name: '' }
-
+// Fetches + parses ANY schedule sheet URL (live source or an archived one — see
+// schedule_archive), using the edge Cache API to avoid re-fetching Google on every 45s
+// auto-refresh from every user (mirrors the old server-side TTL cache). `forceRefresh`
+// (admin "refresh" button) bypasses it.
+export async function fetchScheduleMatrixForUrl(url, forceRefresh) {
   const spreadsheetId = extractSpreadsheetId(url)
   if (!spreadsheetId) return { error: 'schedule_load_failed' }
 
@@ -155,4 +153,12 @@ export async function readScheduleMatrix(db, forceRefresh) {
   }
 
   return result
+}
+
+// The live/current schedule source (settings.current_schedule_sheet_url) — what the
+// Home map and Schedule page actually use.
+export async function readScheduleMatrix(db, forceRefresh) {
+  const url = await getSetting(db, 'current_schedule_sheet_url')
+  if (!url) return { configured: false, matrix: [], sheet_name: '' }
+  return fetchScheduleMatrixForUrl(url, forceRefresh)
 }

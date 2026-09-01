@@ -2398,6 +2398,12 @@ textarea.input {
   border-bottom-color: var(--accent);
 }
 
+.admin-hint {
+  color: var(--text-2);
+  font-size: 13px;
+  margin: 0 0 12px;
+}
+
 .admin-toolbar {
   display: flex;
   align-items: center;

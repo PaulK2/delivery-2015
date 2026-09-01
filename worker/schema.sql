@@ -35,6 +35,17 @@ CREATE TABLE IF NOT EXISTS settings (
   value TEXT NOT NULL DEFAULT ''
 );
 
+-- Admin-managed archive of past schedule sheet links (spec: keep the last ~4 weeks'
+-- Google Sheet URLs on hand so an old week's grid can still be looked up after the
+-- boss moves on to a new sheet). Separate from `settings.current_schedule_sheet_url`,
+-- which is the live/current source the Home map and Schedule page actually use.
+CREATE TABLE IF NOT EXISTS schedule_archive (
+  archive_id TEXT PRIMARY KEY,
+  label TEXT NOT NULL,
+  url TEXT NOT NULL,
+  created_at TEXT NOT NULL DEFAULT ''
+);
+
 CREATE TABLE IF NOT EXISTS audit (
   audit_id TEXT PRIMARY KEY,
   timestamp TEXT NOT NULL,
