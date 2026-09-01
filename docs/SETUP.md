@@ -43,8 +43,12 @@ Script editor — it needs no session token, and writes a JSON dump to a Drive f
 D1-ready SQL (it also fixes the one real quirk in the raw export: Sheets auto-coerces
 stored date strings into Date cells, so the dump needs the same Sofia-timezone
 normalization the rest of the app already applies). Apply the generated file the same
-way as the schema (step 2 above). To keep everyone's existing passwords working, use
-the **same** `PIN_SALT` value the old Apps Script had in its Script Properties.
+way as the schema (step 2 above). The dump includes `password_hash`/
+`password_configured` per employee (so migrated passwords *could* keep working if you
+reuse the old Apps Script's `PIN_SALT` value) — but if there are no active users yet,
+the simpler option is to reset every password instead (`UPDATE employees SET
+password_hash = '', password_configured = 0`) and let everyone go through first-login
+setup fresh; that's what this project's own migration did.
 
 ## 2. Frontend — local development
 
