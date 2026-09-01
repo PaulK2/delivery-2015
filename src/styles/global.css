@@ -2381,6 +2381,7 @@ textarea.input {
   border-bottom: 1px solid var(--border);
   margin-bottom: 16px;
   overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
 }
 .tab {
   border: none;

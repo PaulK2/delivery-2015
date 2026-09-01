@@ -75,7 +75,7 @@ const data = JSON.parse(readFileSync(inputPath, 'utf8'))
 let sql = 'PRAGMA foreign_keys = OFF;\n\n'
 
 // employees — include the two named admins that exist in code (ADMIN_USER_NAMES) but
-// weren't found in the exported sheet (Маги was added to Backend.gs in a prior session
+// weren't found in the exported sheet (МАГИ was added to Backend.gs in a prior session
 // but migrateAdminsAndAuth() was never re-run against the live sheet before this export).
 const employees = data.employees.map((e) => [
   sqlLit(e.employee_id), sqlLit(e.name), sqlLit(e.role || 'employee'),
@@ -83,7 +83,7 @@ const employees = data.employees.map((e) => [
 ])
 const existingNames = new Set(data.employees.map((e) => String(e.name || '').toLowerCase().replace(/\s+/g, '')))
 if (!existingNames.has('маги')) {
-  employees.push([sqlLit('EMP-magi-admin01'), sqlLit('Маги'), sqlLit('admin'), sqlLit(''), '0', '1'])
+  employees.push([sqlLit('EMP-magi-admin01'), sqlLit('МАГИ'), sqlLit('admin'), sqlLit(''), '0', '1'])
 }
 sql += insert(
   'employees',

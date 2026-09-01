@@ -63,11 +63,11 @@ var SCHEDULE_CACHE_PREFIX = 'schedule_raw:';
 
 // Administration belongs to these real named users — there is no shared admin account.
 // migrateAdminsAndAuth() promotes any that exist to the 'admin' role and creates the
-// MUST_EXIST ones if missing. Маги is a review-only admin (full admin rights, same as
+// MUST_EXIST ones if missing. МАГИ is a review-only admin (full admin rights, same as
 // ЦЕЦО/СИМО below) — NOT added to AVAILABILITY_WORKER_ADMINS, so she gets the same
 // permissions as ЦЕЦО, not the worker-admin behavior of ПАВЕЛ/В. ПЕТКОВ.
-var ADMIN_USER_NAMES = ['ЦЕЦО', 'СИМО', 'ПАВЕЛ', 'В. ПЕТКОВ', 'Маги'];
-var ADMIN_MUST_EXIST = ['ЦЕЦО', 'СИМО', 'Маги'];
+var ADMIN_USER_NAMES = ['ЦЕЦО', 'СИМО', 'ПАВЕЛ', 'В. ПЕТКОВ', 'МАГИ'];
+var ADMIN_MUST_EXIST = ['ЦЕЦО', 'СИМО', 'МАГИ'];
 // Admins who ALSO work shifts and may therefore submit their own availability. Other
 // admins (ЦЕЦО, СИМО) only review the team and cannot submit.
 var AVAILABILITY_WORKER_ADMINS = ['ПАВЕЛ', 'В. ПЕТКОВ'];

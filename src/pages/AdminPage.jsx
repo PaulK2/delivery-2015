@@ -14,7 +14,7 @@ const TABS = [
   { key: 'passwords', label: 'Пароли', C: AdminPasswords },
   { key: 'vehicles', label: 'Автомобили', C: AdminVehicles },
   { key: 'locations', label: 'Локации', C: AdminLocations },
-  { key: 'scheduleArchive', label: 'Архив график', C: AdminScheduleArchive },
+  { key: 'scheduleArchive', label: 'Архив', C: AdminScheduleArchive },
 ]
 
 export default function AdminPage() {
