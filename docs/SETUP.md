@@ -1,80 +1,77 @@
 # Setup guide
 
-Two halves: the **backend** (Google Sheets + Apps Script) and the **frontend**
-(this Vite/React app on GitHub Pages).
+Two halves: the **backend** (a Cloudflare Worker + D1, in `worker/`) and the
+**frontend** (this Vite/React app), deployed together as one Cloudflare project. The
+boss's weekly schedule stays a separate, read-only Google Sheet the Worker fetches
+directly.
 
-## 1. Backend — Google Sheets + Apps Script
+## 1. Backend — Cloudflare Worker + D1
 
-The backend is a single file: **`backend/Backend.gs`**. It is bound to one
-spreadsheet (the "Fleet App Data" datastore) and reads a **separate, read-only**
-management schedule sheet.
+The backend is `worker/index.js` (entry) + `worker/routes/*.js` + `worker/lib/*.js`,
+backed by a D1 database (SQL) bound as `env.DB`. Schema lives in `worker/schema.sql`.
 
-1. Create a new Google Spreadsheet — this becomes the datastore.
-2. **Extensions → Apps Script**. Delete the default `Code.gs`.
-3. Create a file and paste all of `backend/Backend.gs` into it. Save.
-4. Run the **`setup()`** function once (select it, click **Run**, grant
-   permissions). It:
-   - stores the datastore spreadsheet id in Script Properties,
-   - generates a random `PIN_SALT` in Script Properties (never in the frontend/repo),
-   - creates every tab (Employees, Locations, Sessions, Settings, Audit, Cars,
-     UsageHistory, Maintenance, Documents, Availability),
-   - seeds default Settings and a first admin: **`Администратор` / PIN `1234`**.
-5. Change the admin PIN and add employees (`setEmployeePinManual()` helper, or the
-   `saveEmployee` / `resetEmployeePin` admin API once the Admin UI lands).
-6. **Deploy → New deployment → Web app**:
-   - Execute as: **Me**
-   - Who has access: **Anyone**  ← the "even anonymous" option; required so the
-     browser can call it without a Google login.
-   - Deploy, then copy the **Web app URL** (ends in `/exec`).
-
-> Re-deploy (Manage deployments → edit → new version) after any backend change so
-> the live `/exec` URL serves the latest code.
+1. `npx wrangler d1 create <your-db-name>` and put the returned `database_id` into
+   `wrangler.jsonc`'s `d1_databases` entry (binding name `DB`).
+2. Apply the schema: `npx wrangler d1 execute <your-db-name> --local --file=worker/schema.sql`
+   for local dev, and `--remote` instead of `--local` for production.
+3. Set the password-hashing salt as a secret (any random string — pick a new one for a
+   fresh install; only reuse a specific value if migrating existing password hashes,
+   see below): `npx wrangler secret put PIN_SALT`. For local dev, put the same key in
+   `.dev.vars` (see `.dev.vars.example`) instead — `wrangler secret` is production-only.
+4. `npm run dev` (Vite + the Cloudflare plugin run the Worker locally too — `/api/*`
+   is live at `http://localhost:5173/api`) or `npm run deploy` for production.
 
 ### Schedule source
-The weekly schedule is a **separate** Google Sheet. Set it either in-app
-(**График → Google Sheet за текущия график**, admin only) or by editing
-`INITIAL_SCHEDULE_URL` / running `setTestScheduleUrl()`. The deploying account must
-have **read** access to that sheet. The app **never writes** to it. See
-[SHEETS_SCHEMA.md](SHEETS_SCHEMA.md) for the grid format the parser expects.
+The weekly schedule is a **separate**, read-only Google Sheet — the app never writes to
+it. It must be link-viewable (Anyone with the link → Viewer), since the Worker fetches
+it via Google's public CSV export (`/export?format=csv&gid=...`), no credentials
+involved. Set it in-app (**График → Google Sheet за текущия график**, admin only) or
+directly in D1 (`settings` table, keys `current_schedule_sheet_url` /
+`schedule_tab_name`). See [SHEETS_SCHEMA.md](SHEETS_SCHEMA.md) for the grid format the
+parser expects.
+
+> Only gid-based tab selection works (a URL with `?gid=...`, which is what you get by
+> navigating to a tab and copying the URL) — there's no authenticated Sheets API access
+> to resolve a tab *name* to its gid for an unauthenticated fetch.
+
+### Migrating existing data from the old Google Sheets datastore
+If you're moving from the retired Apps Script backend (`backend/Backend.gs`, kept in
+the repo as a dormant reference only): that file still has a temporary
+`exportAllData`/`runExportAllData` pair (run `runExportAllData` directly from the Apps
+Script editor — it needs no session token, and writes a JSON dump to a Drive file).
+`worker/migration/build-import-sql.mjs <export.json> <output.sql>` turns that dump into
+D1-ready SQL (it also fixes the one real quirk in the raw export: Sheets auto-coerces
+stored date strings into Date cells, so the dump needs the same Sofia-timezone
+normalization the rest of the app already applies). Apply the generated file the same
+way as the schema (step 2 above). To keep everyone's existing passwords working, use
+the **same** `PIN_SALT` value the old Apps Script had in its Script Properties.
 
 ## 2. Frontend — local development
 
 ```bash
 npm install
-cp .env.example .env.local   # put your /exec URL in VITE_API_URL
 npm run dev
 ```
 
-Open the printed localhost URL and log in (employee + PIN).
+Open the printed localhost URL and log in (employee + personal password — set on
+first login, minimum 6 characters). The frontend talks to the Worker same-origin at
+`/api` — nothing to configure.
 
-> The Apps Script URL can also be overridden at runtime:
-> `localStorage.setItem('fv_api_url', '<your /exec url>')` in the browser console.
+> The backend URL can be overridden at runtime (e.g. to point a local frontend at a
+> different deployed Worker): `localStorage.setItem('fv_api_url', '<url>')` in the
+> browser console.
 
-## 3. Deploy the frontend to GitHub Pages
+## 3. Deploy
 
-1. Push to `main`; `.github/workflows/deploy.yml` builds and deploys.
-2. Repo **Settings → Pages → Source: GitHub Actions**.
-3. (Optional) Bake the backend URL in at build time: **Settings → Secrets and
-   variables → Actions → Variables**, add `VITE_API_URL`.
+```bash
+npm run deploy   # builds, then `wrangler deploy` — ships the SPA + Worker + D1 binding together
+```
 
-### Custom domain
-Put a `CNAME` file with your domain in `public/` and set it under
-**Settings → Pages → Custom domain**.
-
-## 4. Deploy the frontend to Cloudflare (static assets)
-
-The Cloudflare deployment serves the Vite build as static assets — there is no
-Worker API layer. It rebuilds from `main` on every push. Because `.env.local` is
-git-ignored, the committed **`.env.production`** file supplies `VITE_API_URL` at
-build time so the production bundle talks to the same Apps Script `/exec` backend
-as local dev. Update the URL there if the Apps Script deployment ID changes.
-
-> Prefer a Cloudflare **build-time environment variable** (`VITE_API_URL`) in the
-> dashboard when available — it takes precedence over `.env.production`, which is
-> the fallback. The `/exec` URL is not a secret; auth stays inside Apps Script.
+This is one Cloudflare project serving both the static app and the `/api` Worker — no
+separate frontend/backend deployment steps, no CORS to worry about (same-origin).
 
 ## Notes
-- Secrets (`PIN_SALT`, PIN hashes) live only in Apps Script Script Properties —
-  never in the browser or the repo. The `/exec` URL itself is not a secret.
-- CORS: the frontend sends `text/plain` POST bodies so the browser skips the
-  preflight that Apps Script Web Apps do not answer.
+- Secrets (`PIN_SALT`, password hashes) live only in the Worker's environment/D1 —
+  never in the browser or the repo.
+- Every user authenticates with a personal password (min 6 characters), created on
+  first login — there is no shared/default account.

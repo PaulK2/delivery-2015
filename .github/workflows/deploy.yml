@@ -1,8 +1,11 @@
+# DISABLED: the backend now runs as a Cloudflare Worker deployed alongside this app
+# (worker/, see wrangler.jsonc) — the frontend calls it same-origin at /api. GitHub
+# Pages is static-only and cannot run that Worker, so a GitHub Pages build would load
+# but every API call (including login) would fail. Production deploys go through
+# `npm run deploy` (Cloudflare) instead. Left here for reference / manual runs only.
 name: Deploy to GitHub Pages
 
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
 
 permissions:

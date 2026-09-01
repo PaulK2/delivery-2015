@@ -11,3 +11,7 @@ dist/
 .dev.vars*
 !.dev.vars.example
 !.env.example
+
+# one-time D1 migration artifacts — contain password hashes, never committed
+fleet-export-*.json
+worker/migration/import.sql

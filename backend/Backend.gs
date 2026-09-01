@@ -5042,6 +5042,114 @@ function confirmPayrollReceived(params, ctx) {
 
 
 /* ============================================================================
+ * ONE-TIME DATA EXPORT — for the move to Cloudflare Workers + D1.
+ *
+ * Admin-only. Dumps every OPERATIONAL table as JSON in one response: Employees
+ * (INCLUDING password_hash/password_configured, so existing passwords keep working
+ * in the new backend), Locations, Settings, Audit (history), Cars, UsageHistory,
+ * Maintenance, Documents, Availability, Orders, FuelExpenses, DailyReports, Payroll.
+ * Sessions are deliberately excluded — they're meaningless once the frontend stops
+ * calling this backend (everyone logs in again against the new one).
+ *
+ * This is a TEMPORARY route: remove exportAllData() and its ROUTES entry once the
+ * migration has been run and verified.
+ * ========================================================================== */
+function exportAllData(params, ctx) {
+
+  var notAdmin = requireAdmin(ctx);
+  if (notAdmin) return notAdmin;
+
+  function dump(tabName) {
+    return readObjects(tabName).map(function(row) {
+      delete row.__row;
+      return row;
+    });
+  }
+
+  return ok({
+    employees: dump(TABS.EMPLOYEES),
+    locations: dump(TABS.LOCATIONS),
+    settings: dump(TABS.SETTINGS),
+    audit: dump(TABS.AUDIT),
+    cars: dump(TABS.CARS),
+    usage_history: dump(TABS.USAGE),
+    maintenance: dump(TABS.MAINTENANCE),
+    documents: dump(TABS.DOCUMENTS),
+    availability: dump(TABS.AVAILABILITY),
+    orders: dump(TABS.ORDERS),
+    fuel_expenses: dump(TABS.FUEL),
+    daily_reports: dump(TABS.REPORTS),
+    payroll: dump(TABS.PAYROLL)
+  });
+}
+
+
+/**
+ * RUN THIS ONE DIRECTLY FROM THE APPS SCRIPT EDITOR (select runExportAllData in the
+ * function dropdown, click Run) — NOT via the web app, so it needs no session token.
+ * Running code here already requires owner/editor access to this script, which is
+ * equivalent to admin, so it calls exportAllData() with a fabricated admin ctx.
+ *
+ * Writes the export to a new Google Drive file (avoids the execution log's size/
+ * truncation limits) and logs the file's URL — approve the Drive permission prompt
+ * the first time. Download that file locally, tell Claude its local path, then
+ * delete the Drive file (it contains password hashes).
+ */
+function runExportAllData() {
+
+  var result = exportAllData({}, { user: { role: 'admin' } });
+  var json = JSON.stringify(result.data);
+
+  var file = DriveApp.createFile(
+    'fleet-export-' + new Date().getTime() + '.json',
+    json,
+    MimeType.PLAIN_TEXT
+  );
+
+  Logger.log('Export written: ' + file.getUrl());
+  Logger.log('Total size: ' + json.length + ' characters.');
+  Logger.log('Download it locally, then delete this Drive file (it contains password hashes).');
+}
+
+
+/**
+ * DIAGNOSTIC — run directly from the editor. Logs the first few rows of the currently
+ * configured schedule sheet exactly as Apps Script's getDisplayValues() sees them
+ * (what the live app has always parsed against), so it can be compared with what a
+ * plain CSV export of the same sheet/tab returns. Touches nothing.
+ */
+function diagnoseScheduleGrid() {
+
+  var url = getSetting('current_schedule_sheet_url');
+  Logger.log('Configured URL: ' + url);
+
+  var sheet = getScheduleSheetFromUrl(url);
+  if (!sheet) {
+    Logger.log('Could not open the configured schedule sheet/tab.');
+    return;
+  }
+
+  Logger.log('Sheet name: ' + sheet.getName() + '  gid: ' + sheet.getSheetId());
+
+  var range = sheet.getDataRange();
+  Logger.log('getDataRange: ' + range.getNumRows() + ' rows x ' + range.getNumColumns() + ' cols');
+
+  var values = range.getDisplayValues();
+  for (var r = 0; r < Math.min(5, values.length); r++) {
+    Logger.log('Row ' + r + ': ' + JSON.stringify(values[r].slice(0, 12)));
+  }
+
+  // Frozen/hidden-row info — a common source of CSV-export vs Range-read mismatches.
+  Logger.log('Frozen rows: ' + sheet.getFrozenRows());
+  for (var hr = 1; hr <= Math.min(5, sheet.getMaxRows()); hr++) {
+    if (sheet.isRowHiddenByUser(hr)) {
+      Logger.log('Row ' + hr + ' (1-based) is HIDDEN.');
+    }
+  }
+}
+
+
+/* ============================================================================
  * WEB API ROUTES
  * ========================================================================== */
 
@@ -5298,6 +5406,13 @@ var ROUTES = {
   confirmPayrollReceived: {
     fn: confirmPayrollReceived,
     lock: true
+  },
+
+
+  /* Migration (temporary — remove after the D1 cutover is verified) */
+
+  exportAllData: {
+    fn: exportAllData
   }
 };
 

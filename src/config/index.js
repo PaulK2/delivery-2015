@@ -2,14 +2,13 @@
 // Per spec §89/§90: shift times, map center, warning thresholds, API URL, timezone
 // all live here — never hardcoded across components.
 
-// The Apps Script Web App URL is NOT a secret (secrets stay inside Apps Script).
-// Priority: localStorage override (set by admin) > build-time env var > empty.
+// The backend is the Worker deployed alongside this same app (see worker/), reachable
+// same-origin at /api in both local dev (the Cloudflare Vite plugin) and production —
+// no external URL to configure. The localStorage override remains as an escape hatch
+// (e.g. pointing a local frontend at a different deployed Worker).
 const STORED_API_URL = safeLocalStorage('fv_api_url')
 
-export const API_URL =
-  STORED_API_URL ||
-  import.meta.env.VITE_API_URL ||
-  '' // must be configured before the backend works — see docs/SETUP.md
+export const API_URL = STORED_API_URL || '/api'
 
 export function setApiUrl(url) {
   try {

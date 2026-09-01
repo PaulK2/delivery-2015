@@ -1,58 +1,38 @@
 # Автопарк — delivery-2015
 
 Internal fleet operations platform. Mobile-first web app with a **100% Bulgarian UI**,
-backed by **Google Sheets + Google Apps Script** (no traditional SQL database).
+backed by a **Cloudflare Worker + D1** (SQL database). The boss's weekly schedule stays
+a **read-only Google Sheet** — the Worker fetches it directly (public CSV export, no
+Google credentials needed); everything else (employees, cars, availability, orders,
+fuel, payroll, …) lives in D1.
 
 ```
-User → React app (GitHub Pages) → Apps Script Web App → Google Sheets
+User → React app (Cloudflare) → Worker (/api) → D1
+                                       ↓
+                          boss's schedule Google Sheet (read-only CSV fetch)
 ```
 
 ## Status
 
-**Backend** (`backend/Backend.gs`) — the real deployed Apps Script — already covers
-every phase: auth/sessions, employees, locations, schedule (read-only), cars +
-take/release, usage history, maintenance, documents, availability, audit log,
-script locking.
+**Backend** (`worker/`) — a Cloudflare Worker deployed alongside the frontend in the
+same project — covers every phase: auth/sessions, employees, locations, schedule
+(read-only), cars + take/release, usage history, maintenance, documents, availability,
+orders, fuel expenses, daily reports, payroll, audit log.
 
-**Frontend** — Phase 1 wired end-to-end against the live backend:
+Originally built against Google Sheets + Apps Script (`backend/Backend.gs`, kept in the
+repo as a dormant historical reference — nothing calls it anymore); migrated to
+Workers + D1 for speed, reliability, and independence from Google Sheets as an
+operational datastore.
 
-- Scaffold (Vite + React, HashRouter, PWA manifest), central config, BG date/shift utils
-- Auth: employee + PIN login, server-side sessions
-- Home: interactive Sofia map (Leaflet), date navigation, location detail panel
-- Schedule: real weekly-**grid** parser (isolated in `services/schedule/parser.js`),
-  weekday matching, filters, admin schedule-source config
-- Vehicles (Phase 2): fleet list with plate search + status summary, vehicle detail
-  page, take / release (with parking form), double-reservation prevention, usage
-  history with period presets, read-only active-issues section, toast notifications
-- Availability (Phase 3): next-week matrix (none/full/evening per day, single-select),
-  save own availability, team overview matrix, admin open/close + active-week +
-  per-day counts + who-hasn't-submitted
-- Maintenance (Phase 4): report issue (category/severity), prominent active issues,
-  critical auto-blocks the vehicle + admin restore-to-service, admin resolve with
-  repair details, per-vehicle repair history, global Сигнали и поддръжка page with
-  filters (status/severity/category/plate)
-- Documents (Phase 5): reusable VehicleDocument model (insurance, annual inspection,
-  vignette, road tax, casco, …) with 🟢/🟡/🔴 valid/expiring/expired status per
-  configurable warning threshold; admin add/edit per vehicle; admin "Предстоящи
-  срокове" widget on Home sorted by nearest expiry
-- Administration + PWA + search (Phase 6): admin-only `/admin` with tabbed dashboard
-  (fleet/issues/documents/availability counters) and CRUD for employees (add/edit,
-  role, active, initial + reset PIN), vehicles (add/edit incl. inactive), and work
-  locations; app-wide quick search (header 🔍 or the `/` key) that jumps to a vehicle
-  by plate/make/model; installable PWA — web manifest, icon, `theme-color`, and a
-  stale-while-revalidate service worker for the app shell (registered in production)
-
-> Phase 3 added two backend actions (`getAvailabilityStatus`, `setAvailabilityWeek`)
-> and a date normalizer in `Backend.gs` — **redeploy the Apps Script** for accurate
-> open/close state, week selection, and duplicate-free re-saves. The frontend degrades
-> gracefully until then (normalizes dates client-side; assumes the period is open).
-
-All frontend phases (1–6) are now wired end-to-end against the existing backend.
+**Frontend** — every screen wired end-to-end: Home map, График (schedule), Моят ден,
+Автомобили (take/release, maintenance, documents), Моята наличност, Администрация
+(employees/vehicles/locations/passwords/payroll), global search, installable PWA.
 
 ## Getting started
 
 See **[docs/SETUP.md](docs/SETUP.md)** for backend + frontend setup, and
-**[docs/SHEETS_SCHEMA.md](docs/SHEETS_SCHEMA.md)** for the data model.
+**[docs/SHEETS_SCHEMA.md](docs/SHEETS_SCHEMA.md)** for the D1 schema and the boss's
+schedule grid format.
 
 ```bash
 npm install
@@ -62,7 +42,11 @@ npm run dev
 ## Structure
 
 ```
-backend/            Backend.gs — the deployed Google Apps Script (API + data bridge)
+worker/             Cloudflare Worker (the backend) — /api/* routes, D1 access
+  routes/           one module per domain (employees, cars, availability, payroll, …)
+  lib/               auth/session/password, shared utils, schedule CSV fetch + parse
+  schema.sql         D1 schema
+backend/Backend.gs  dormant — the original Apps Script backend, kept for reference only
 src/
   config/           app configuration (shift times, map, thresholds)
   services/         api client, auth, schedule (+ isolated parser)
@@ -71,5 +55,5 @@ src/
   pages/            Home, Schedule, Availability, Vehicles, Maintenance, Admin, Login
   utils/            Bulgarian date/time, shift helpers
   styles/           design system (global.css)
-docs/               setup + sheet schema
+docs/               setup + D1 schema + schedule grid format
 ```

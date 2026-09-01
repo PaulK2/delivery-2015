@@ -1,4 +1,10 @@
-# Auth & Admin Migration — run once
+# Auth & Admin Migration — run once (historical)
+
+> **Superseded.** This describes the PIN→password migration on the old Apps Script
+> backend (`backend/Backend.gs`), which is now dormant — the app runs on a Cloudflare
+> Worker + D1 instead (see [SETUP.md](SETUP.md)). Every password hash from that backend
+> was carried over during the D1 migration (same salted-SHA-256 algorithm, same
+> `PIN_SALT`), so no user had to reset anything. Kept here for historical context only.
 
 **Every user has a personal password (min 6 characters), created on first login.** This
 release also replaces the shared `Администратор` account with **real named admins**. The
