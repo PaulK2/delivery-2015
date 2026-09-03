@@ -13,6 +13,7 @@ export const NAV_ITEMS = [
   { to: '/vehicles', label: 'Автомобили', icon: 'car', group: 'primary' },
   { to: '/availability', label: 'Моята наличност', icon: 'calendar-check', group: 'more' },
   { to: '/maintenance', label: 'Сигнали и поддръжка', icon: 'wrench', group: 'more' },
+  { to: '/roadbook', label: 'Пътен лист', icon: 'truck', adminOnly: true, group: 'more' },
   { to: '/admin', label: 'Администрация', icon: 'settings', adminOnly: true, group: 'more' },
 ]
 

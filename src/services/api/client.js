@@ -160,6 +160,42 @@ async function attemptRequest(action, params, externalSignal) {
   return payload.data
 }
 
+// Downloads a file-returning action (Пътен лист Excel export) — these respond with
+// either the raw file (success) or the usual JSON error envelope (failure), told apart
+// by Content-Type. Returns { blob, filename } on success; throws ApiError like api().
+export async function apiDownloadFile(action, params = {}) {
+  if (!API_URL) {
+    throw new ApiError('Сървърът не е конфигуриран. Свържете се с администратор.', 'no_api_url')
+  }
+
+  let res
+  try {
+    res = await fetch(API_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({ action, token: getToken(), params }),
+    })
+  } catch {
+    throw new ApiError('Няма връзка със сървъра.', 'network', { transient: true })
+  }
+
+  const contentType = res.headers.get('content-type') || ''
+  if (contentType.includes('json')) {
+    const payload = await res.json().catch(() => null)
+    const code = payload?.error || 'server_error'
+    throw new ApiError(mapErrorBG(code), code, { transient: TRANSIENT_CODES.has(code) })
+  }
+  if (!res.ok) {
+    throw new ApiError('Възникна проблем. Опитайте отново.', 'server_error', { transient: true })
+  }
+
+  const disposition = res.headers.get('content-disposition') || ''
+  const match = /filename="([^"]+)"/.exec(disposition)
+  const filename = match ? match[1] : 'export.xlsx'
+  const blob = await res.blob()
+  return { blob, filename }
+}
+
 // Map machine error codes coming from the backend to Bulgarian messages (spec §78).
 function mapErrorBG(code) {
   const M = {
@@ -189,6 +225,7 @@ function mapErrorBG(code) {
     schedule_wrong_tab:
       'Връзката се отвори, но не сочи към листа с графика. Отворете Google Sheet-а, изберете точно листа с графика (реда с „ДАТА“ в клетка A1), и копирайте адреса от адресната лента точно оттам — не общ линк за споделяне.',
     archive_limit: 'Достигнат е максимумът от 4 архивирани връзки. Изтрийте някоя, преди да добавите нова.',
+    roadbook_export_failed: 'Генерирането на Excel файла не бе успешно. Опитайте отново.',
     availability_closed: 'Приемът на наличност е затворен.',
     validation: 'Проверете въведените данни.',
     server_error: 'Възникна проблем със сървъра. Опитайте отново.',

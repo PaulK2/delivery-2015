@@ -52,6 +52,30 @@ export function mondayOfISO(iso) {
   return d.toISOString().slice(0, 10)
 }
 
+// Sunday (yyyy-MM-dd) of the week starting at the given Monday — pure calendar math,
+// same UTC-anchored convention as mondayOfISO.
+export function weekEndFromMonday(mondayIso) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(mondayIso)
+  if (!m) return mondayIso
+  const d = new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3])))
+  d.setUTCDate(d.getUTCDate() + 6)
+  return d.toISOString().slice(0, 10)
+}
+
+// yyyy-MM-dd -> DD.MM.YYYY (Bulgarian date convention used in the UI and exports).
+export function formatDateBG(iso) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(iso || ''))
+  if (!m) return ''
+  return `${m[3]}.${m[2]}.${m[1]}`
+}
+
+// yyyy-MM-ddTHH:mm(:ss)? -> "DD.MM.YYYY HH:mm" (Пътен лист export format, spec: "03.09.2026 11:04").
+export function formatDateTimeBG(iso) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/.exec(String(iso || ''))
+  if (!m) return ''
+  return `${m[3]}.${m[2]}.${m[1]} ${m[4]}:${m[5]}`
+}
+
 // Monday of NEXT week, in Sofia time (yyyy-MM-dd).
 export function nextMondayISO() {
   const todayIso = dateOnly(new Date())

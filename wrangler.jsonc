@@ -16,5 +16,11 @@
       "database_name": "fleetview-db",
       "database_id": "ec90213a-598b-40ad-b0c3-5905c6c1c1d4"
     }
-  ]
+  ],
+  // Weekly Пътен лист (Road Book) auto-export — Monday 03:00 UTC. Safely into Monday
+  // even accounting for Sofia's UTC+2/+3 offset, so the handler's "today" is always
+  // unambiguously Monday (see worker/index.js's scheduled() for why that matters).
+  "triggers": {
+    "crons": ["0 3 * * 1"]
+  }
 }

@@ -14,6 +14,7 @@ import * as fuel from './fuel.js'
 import * as reports from './reports.js'
 import * as payroll from './payroll.js'
 import * as devnotes from './devnotes.js'
+import * as roadbook from './roadbook.js'
 
 export const ROUTES = {
   // Authentication
@@ -100,4 +101,10 @@ export const ROUTES = {
   getDevNotes: devnotes.getDevNotes,
   addDevNote: devnotes.addDevNote,
   deleteDevNote: devnotes.deleteDevNote,
+
+  // Пътен лист (Road Book) — admin only
+  getRoadBook: roadbook.getRoadBook,
+  exportRoadBookExcel: roadbook.exportRoadBookExcel,
+  getRoadBookExportArchive: roadbook.getRoadBookExportArchive,
+  downloadRoadBookExport: roadbook.downloadRoadBookExport,
 }

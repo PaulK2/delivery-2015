@@ -14,6 +14,7 @@ const VehicleDetailPage = lazy(() => import('./pages/VehicleDetailPage.jsx'))
 const AvailabilityPage = lazy(() => import('./pages/AvailabilityPage.jsx'))
 const MaintenancePage = lazy(() => import('./pages/MaintenancePage.jsx'))
 const AdminPage = lazy(() => import('./pages/AdminPage.jsx'))
+const RoadBookPage = lazy(() => import('./pages/RoadBookPage.jsx'))
 const DayPage = lazy(() => import('./pages/DayPage.jsx'))
 const MorePage = lazy(() => import('./pages/MorePage.jsx'))
 
@@ -122,6 +123,14 @@ export default function App() {
           element={
             <Suspense fallback={<PageLoading />}>
               <AdminPage />
+            </Suspense>
+          }
+        />
+        <Route
+          path="/roadbook"
+          element={
+            <Suspense fallback={<PageLoading />}>
+              <RoadBookPage />
             </Suspense>
           }
         />

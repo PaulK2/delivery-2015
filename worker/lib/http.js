@@ -16,3 +16,16 @@ export function jsonResponse(object) {
     headers: { 'Content-Type': 'application/json; charset=utf-8' },
   })
 }
+
+// A handler returns this instead of ok()/fail() when the action's whole point is to
+// hand back a file (the Пътен лист .xlsx export) — handleApi() in index.js recognizes
+// the shape and produces a raw binary Response instead of the usual JSON envelope.
+export function fileResponse(bytes, filename, contentType) {
+  return {
+    __fileResponse: true,
+    bytes,
+    filename,
+    contentType:
+      contentType || 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  }
+}

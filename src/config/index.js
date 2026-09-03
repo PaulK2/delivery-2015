@@ -21,7 +21,7 @@ export function setApiUrl(url) {
 
 // Bump on each deploy so we can confirm which frontend build is actually live (shown
 // to admins in Още, and logged to the console at startup).
-export const APP_VERSION = 'ui-2026-09-01-schedule-archive'
+export const APP_VERSION = 'ui-2026-09-03-roadbook'
 
 export const CONFIG = {
   appName: 'Delivery 2015',

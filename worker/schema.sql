@@ -101,6 +101,31 @@ CREATE TABLE IF NOT EXISTS usage_history (
   has_safety_vest INTEGER NOT NULL DEFAULT 0
 );
 CREATE INDEX IF NOT EXISTS idx_usage_car ON usage_history(car_id);
+-- Пътен лист (Road Book) reads usage_history directly (it's already the permanent
+-- source of truth — see worker/lib/roadbook.js) filtered/sorted by date, so it needs
+-- these in addition to the car-only index above.
+CREATE INDEX IF NOT EXISTS idx_car_usage_started ON usage_history(start_at);
+CREATE INDEX IF NOT EXISTS idx_car_usage_car_started ON usage_history(car_id, start_at);
+
+-- Frozen weekly Excel snapshots (Пътен лист). One row per week (UNIQUE week_start) —
+-- regenerating a week replaces its row rather than accumulating duplicates. The
+-- generated file is stored as a BLOB directly in D1 (files are tiny — a week of a
+-- modest fleet's usage rows — so this avoids needing a separate object-storage binding
+-- like R2 for what's a simple, self-contained feature).
+CREATE TABLE IF NOT EXISTS roadbook_exports (
+  export_id TEXT PRIMARY KEY,
+  week_start TEXT NOT NULL,
+  week_end TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'ready', -- 'ready' | 'error'
+  generated_at TEXT NOT NULL,
+  generated_by_id TEXT NOT NULL DEFAULT '',
+  generated_by_name TEXT NOT NULL DEFAULT '',
+  error_message TEXT NOT NULL DEFAULT '',
+  file_name TEXT NOT NULL DEFAULT '',
+  file_blob BLOB,
+  UNIQUE(week_start)
+);
+CREATE INDEX IF NOT EXISTS idx_roadbook_exports_week ON roadbook_exports(week_start);
 
 CREATE TABLE IF NOT EXISTS maintenance (
   maintenance_id TEXT PRIMARY KEY,
